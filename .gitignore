@@ -1,3 +1,6 @@
+# eslintrc file:
+.eslintrc.json
+
 # Logs
 logs
 *.log
