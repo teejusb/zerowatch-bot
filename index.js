@@ -83,7 +83,7 @@ client.on('message', (message) => {
   // Temporary, limit commands to a single channel.
   if (message.channel.name !== 'general') return;
 
-  const args = message.content.slice(prefix.length).split(/ +/);
+  const args = message.content.slice(prefix.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
 
   const command = client.commands.get(commandName) ||
