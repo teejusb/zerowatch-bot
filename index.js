@@ -1,13 +1,13 @@
 const fs = require('fs');
 const Discord = require('discord.js');
-const { prefix, token, guildId, guestCode } = require('./config.json');
+const {prefix, token, guildId, guestCode} = require('./config.json');
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
 
 // Read all available commands from disk.
 const commandFiles = fs.readdirSync('./commands')
-                       .filter(file => file.endsWith('.js'));
+    .filter((file) => file.endsWith('.js'));
 
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
@@ -19,7 +19,7 @@ const cooldowns = new Discord.Collection();
 
 // Keep track of existing guest invite usages.
 // This is used to let to bot automatically assign roles if necessary.
-let guest_uses = 0;
+let guestUses = 0;
 
 // A pretty useful method to create a delay without blocking the whole script.
 const wait = require('util').promisify(setTimeout);
@@ -34,17 +34,18 @@ client.once('ready', () => {
   wait(1000);
 
   // Get all the invites from the Zerowatch discord.
-  let guild = client.guilds.get(guildId);
+  const guild = client.guilds.get(guildId);
 
   if (guild) {
     guild.fetchInvites()
-        .then(guildInvites => {
+        .then((guildInvites) => {
           console.log(`There are currently ${guildInvites.size} invites.`);
-          for (var [code, invite] of guildInvites) {
-            console.log(`  Available invite code ${code} with ${invite.uses} uses`);
+          for (const [code, invite] of guildInvites) {
+            console.log(
+                `  Available invite code ${code} with ${invite.uses} uses`);
             // Only need to keep track of guest invite usages.
             if (code === guestCode) {
-              guest_uses = invite.uses;
+              guestUses = invite.uses;
             }
           }
         });
@@ -56,18 +57,15 @@ client.once('ready', () => {
 // ================ On guildMemberAdd ================
 // Handler for when new members join the server.
 
-client.on('guildMemberAdd', member => {
-  member.guild.fetchInvites().then(guildInvites => {
-    for (var [code, invite] of guildInvites) {
-      if (code === guestCode) {
-        // If guest code did not increment, then this was a custom invite.
-        // Give the person the 'Member' role'
-        if (invite.uses == guest_uses) {
-          let role = member.guild.roles.find(r => r.name === 'Member');
-          member.addRole(role, 'Auto-added via bot.');
-        } else {
-          guest_uses = invite.uses;
-        }
+client.on('guildMemberAdd', (member) => {
+  member.guild.fetchInvites().then((guildInvites) => {
+    const invite = guildInvites.get(guestCode);
+    if (invite) {
+      if (invite.uses == guestUses) {
+        const role = member.guild.roles.find((r) => r.name === 'Member');
+        member.addRole(role, 'Auto-added via bot.');
+      } else {
+        guestUses = invite.uses;
       }
     }
   });
@@ -76,19 +74,22 @@ client.on('guildMemberAdd', member => {
 // ================ On message ================
 // Handler for responding to messages (a la slackbot).
 
-client.on('message', message => {
+client.on('message', (message) => {
   // Only respond to messages sent from real users and those that are
   // prefixed appropriatly.
   if (!message.content.startsWith(prefix) ||
-      message.author.bot ||
-      message.channel.name !== 'zerowatch-bot-testing') return;
+      message.author.bot) return;
+
+  // Temporary, limit commands to a single channel.
+  if (message.channel.name !== 'general') return;
 
   const args = message.content.slice(prefix.length).split(/ +/);
   const commandName = args.shift().toLowerCase();
 
   const command = client.commands.get(commandName) ||
                   client.commands.find(
-                      cmd => cmd.aliases && cmd.aliases.includes(commandName));
+                      (cmd) => cmd.aliases &&
+                          cmd.aliases.includes(commandName));
 
   if (!command) return;
 
@@ -97,7 +98,7 @@ client.on('message', message => {
     let reply = `You didnt provide any arguments, ${message.author}!`;
 
     if (command.usage) {
-      reply += '\nThe proper usage would be: '
+      reply += '\nThe proper usage would be: ';
       reply += `\`${prefix}${command.name} ${command.usage}\``;
     }
     return message.channel.send(reply);
