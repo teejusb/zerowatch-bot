@@ -1,6 +1,7 @@
 const fs = require('fs');
 const Discord = require('discord.js');
-const {prefix, token, guildId, guestCode} = require('./config.json');
+const {prefix, token, guildId, guestCode, testChannel} =
+    require('./config.json');
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -81,7 +82,7 @@ client.on('message', (message) => {
       message.author.bot) return;
 
   // Temporary, limit commands to a single channel.
-  if (message.channel.name !== 'general') return;
+  if (message.channel.name !== testChannel) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
