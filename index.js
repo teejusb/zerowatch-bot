@@ -185,6 +185,17 @@ client.on('guildMemberAdd', (member) => {
 // Handler for responding to messages (a la slackbot).
 
 client.on('message', (message) => {
+  if (message.channel.id === pugPollChannelId) {
+    // Only the poll should be posted in this channel.
+    // If a new poll was posted then reset the PUG poll variables.
+    curPugMessage = message;
+    for (const emojiName of valid_days.keys()) {
+      maxDayCounts.set(emojiName, 0);
+    }
+    console.log('New PUG poll was posted.');
+    return;
+  }
+
   // Only respond to messages sent from real users and those that are
   // prefixed appropriatly.
   if (!message.content.startsWith(prefix) ||
