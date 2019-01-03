@@ -84,7 +84,9 @@ client.on('message', (message) => {
   // Temporary, limit commands to a single channel.
   if (message.channel.name !== testChannel) return;
 
-  const args = message.content.slice(prefix.length).trim().split(/ +/);
+  // Regex soup from: https://stackoverflow.com/a/25663729
+  const args = message.content.slice(prefix.length).trim()
+      .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g);
   const commandName = args.shift().toLowerCase();
 
   const command = client.commands.get(commandName) ||
