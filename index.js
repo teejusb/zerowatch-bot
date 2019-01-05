@@ -1,7 +1,11 @@
 const fs = require('fs');
 const Discord = require('discord.js');
-const {prefix, token, guildId, guestCode, testChannel} =
-    require('./config.json');
+// TODO(teejusb): This is going to get unruly real quick. We might just want
+// to load this as 'config' and access the members individually, or find a
+// nicer way to specify many members.
+const {prefix, token, guildId, guestCode, testChannel,
+  pugPollChannelId, pugAnnounceChannelId} =
+      require('./config.json');
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -19,8 +23,60 @@ for (const file of commandFiles) {
 const cooldowns = new Discord.Collection();
 
 // Keep track of existing guest invite usages.
-// This is used to let to bot automatically assign roles if necessary.
+// This is used to let the bot automatically assign roles if necessary.
 let guestUses = 0;
+
+const increment = (map, key) => {
+  if (map.has(key)) {
+    map.set(key, map.get(key) + 1);
+  } else {
+    map.set(key, 1);
+  }
+};
+
+const getDayReactions = (map, message) => {
+  for (const reaction of message.reactions.values()) {
+    switch (reaction.emoji.name) {
+      case '🇲':
+        increment(map, '🇲');
+        break;
+      case '🇹':
+        increment(map, '🇹');
+        break;
+      case '🇼':
+        increment(map, '🇼');
+        break;
+      case '🇷':
+        increment(map, '🇷');
+        break;
+      case '🇫':
+        increment(map, '🇫');
+        break;
+      case '🇸':
+        increment(map, '🇸');
+        break;
+      case '🇺':
+        increment(map, '🇺');
+        break;
+    }
+  }
+};
+
+const validDays = new Map();
+validDays.set('🇲', 'Monday');
+validDays.set('🇹', 'Tuesday');
+validDays.set('🇼', 'Wednesday');
+validDays.set('🇷', 'Thursday');
+validDays.set('🇫', 'Friday');
+validDays.set('🇸', 'Saturday');
+validDays.set('🇺', 'Sunday');
+
+// Keep track of current PUG poll information.
+let curPugMessage;
+const maxDayCounts = new Map();
+for (const emojiName of validDays.keys()) {
+  maxDayCounts.set(emojiName, 0);
+}
 
 // A pretty useful method to create a delay without blocking the whole script.
 const wait = require('util').promisify(setTimeout);
@@ -52,7 +108,60 @@ client.once('ready', () => {
         });
   }
 
+  const pugPollChannel = client.channels.get(pugPollChannelId);
+  if (pugPollChannel) {
+    if (pugPollChannel.lastMessageID) {
+      // The last message posted is the current poll.
+      pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
+          .then((message) => {
+            curPugMessage = message;
+            getDayReactions(maxDayCounts, message);
+            console.log('Found PUG message!');
+          });
+    }
+  }
+
+
   console.log('Ready!');
+});
+
+// ================ On messageReactionAdd ================
+// Handler for when members react to the PUG poll.
+
+client.on('messageReactionAdd', (messageReaction, user) => {
+  // If we can't find the current PUG poll for whatever reason, return early.
+  if (typeof curPugMessage === 'undefined' || curPugMessage === null) return;
+
+  // We only care for reactions to the PUG poll.
+  if (messageReaction.message.id !== curPugMessage.id) return;
+
+  const emojiName = messageReaction.emoji.name;
+
+  // If people reacted to to the PUG poll with a non-valid reaction,
+  // just remove it.
+  if (!validDays.has(emojiName)) {
+    messageReaction.remove(user);
+    return;
+  }
+  // We use maxDayCounts to ensure we only send each of the following
+  // messages once for each of the days. Members can technically add/remove
+  // reactions as they wish so we try and do something about that.
+  // TODO(teejusb): If a user removes a reaction after we already said that
+  // PUGs are on, we should handle that. Figure out a clean way to do this
+  // that also minimizes spam.
+  // TODO(teejusb): It would be cool if we only sent these messages on the day
+  // they were meant for, but that requires us to keep track of what day it is
+  // and when it changes.
+  const curCount = maxDayCounts.get(emojiName);
+  if (messageReaction.count > curCount) {
+    maxDayCounts.set(emojiName, messageReaction.count);
+
+    const pugAnnounce = client.channels.get(pugAnnounceChannelId);
+
+    if (messageReaction.count === 12) {
+      pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
+    }
+  }
 });
 
 // ================ On guildMemberAdd ================
@@ -76,6 +185,17 @@ client.on('guildMemberAdd', (member) => {
 // Handler for responding to messages (a la slackbot).
 
 client.on('message', (message) => {
+  if (message.channel.id === pugPollChannelId) {
+    // Only the poll should be posted in this channel.
+    // If a new poll was posted then reset the PUG poll variables.
+    curPugMessage = message;
+    for (const emojiName of valid_days.keys()) {
+      maxDayCounts.set(emojiName, 0);
+    }
+    console.log('New PUG poll was posted.');
+    return;
+  }
+
   // Only respond to messages sent from real users and those that are
   // prefixed appropriatly.
   if (!message.content.startsWith(prefix) ||
