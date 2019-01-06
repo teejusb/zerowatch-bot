@@ -1,11 +1,19 @@
 const fs = require('fs');
 const Discord = require('discord.js');
-// TODO(teejusb): This is going to get unruly real quick. We might just want
-// to load this as 'config' and access the members individually, or find a
-// nicer way to specify many members.
-const {prefix, token, guildId, guestCode, testChannel,
-  pugPollChannelId, pugAnnounceChannelId} =
-      require('./config.json');
+// TODO(aalberg): Use JSON.parse and maybe some more complex handling here.
+const {token} = require('./config_private.json');
+const config = require('./config.json');
+// Find the active set of per-guild settings.
+let activeConfig = null;
+for (guildSettings of config.perGuildSettings) {
+  if (guildSettings.guildId === config.activeGuild) {
+    activeConfig = guildSettings;
+  }
+}
+if (activeConfig == null) {
+  console.log('No settings found for guild: ' + config.activeGuild);
+  process.exit(1);
+}
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -91,7 +99,7 @@ client.once('ready', () => {
   wait(1000);
 
   // Get all the invites from the Zerowatch discord.
-  const guild = client.guilds.get(guildId);
+  const guild = client.guilds.get(activeConfig.guildId);
 
   if (guild) {
     guild.fetchInvites()
@@ -101,14 +109,14 @@ client.once('ready', () => {
             console.log(
                 `  Available invite code ${code} with ${invite.uses} uses`);
             // Only need to keep track of guest invite usages.
-            if (code === guestCode) {
+            if (code === activeConfig.guestCode) {
               guestUses = invite.uses;
             }
           }
         });
   }
 
-  const pugPollChannel = client.channels.get(pugPollChannelId);
+  const pugPollChannel = client.channels.get(activeConfig.pugPollChannelId);
   if (pugPollChannel) {
     if (pugPollChannel.lastMessageID) {
       // The last message posted is the current poll.
@@ -120,7 +128,6 @@ client.once('ready', () => {
           });
     }
   }
-
 
   console.log('Ready!');
 });
@@ -156,7 +163,7 @@ client.on('messageReactionAdd', (messageReaction, user) => {
   if (messageReaction.count > curCount) {
     maxDayCounts.set(emojiName, messageReaction.count);
 
-    const pugAnnounce = client.channels.get(pugAnnounceChannelId);
+    const pugAnnounce = client.channels.get(activeConfig.pugAnnounceChannelId);
 
     if (messageReaction.count === 12) {
       pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
@@ -169,7 +176,7 @@ client.on('messageReactionAdd', (messageReaction, user) => {
 
 client.on('guildMemberAdd', (member) => {
   member.guild.fetchInvites().then((guildInvites) => {
-    const invite = guildInvites.get(guestCode);
+    const invite = guildInvites.get(activeConfig.guestCode);
     if (invite) {
       if (invite.uses == guestUses) {
         const role = member.guild.roles.find((r) => r.name === 'Member');
@@ -185,7 +192,7 @@ client.on('guildMemberAdd', (member) => {
 // Handler for responding to messages (a la slackbot).
 
 client.on('message', (message) => {
-  if (message.channel.id === pugPollChannelId) {
+  if (message.channel.id === activeConfig.pugPollChannelId) {
     // Only the poll should be posted in this channel.
     // If a new poll was posted then reset the PUG poll variables.
     curPugMessage = message;
@@ -197,15 +204,15 @@ client.on('message', (message) => {
   }
 
   // Only respond to messages sent from real users and those that are
-  // prefixed appropriatly.
-  if (!message.content.startsWith(prefix) ||
+  // config.prefixed appropriatly.
+  if (!message.content.startsWith(config.prefix) ||
       message.author.bot) return;
 
   // Temporary, limit commands to a single channel.
-  if (message.channel.name !== testChannel) return;
+  if (message.channel.name !== activeConfig.testChannel) return;
 
   // Regex soup from: https://stackoverflow.com/a/25663729
-  const args = message.content.slice(prefix.length).trim()
+  const args = message.content.slice(config.prefix.length).trim()
       .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g);
   const commandName = args.shift().toLowerCase();
 
@@ -222,7 +229,7 @@ client.on('message', (message) => {
 
     if (command.usage) {
       reply += '\nThe proper usage would be: ';
-      reply += `\`${prefix}${command.name} ${command.usage}\``;
+      reply += `\`${config.prefix}${command.name} ${command.usage}\``;
     }
     return message.channel.send(reply);
   }
