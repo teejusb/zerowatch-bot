@@ -1,5 +1,7 @@
 const fs = require('fs');
+const cron = require('cron');
 const Discord = require('discord.js');
+
 // TODO(teejusb): This is going to get unruly real quick. We might just want
 // to load this as 'config' and access the members individually, or find a
 // nicer way to specify many members.
@@ -81,6 +83,51 @@ for (const emojiName of validDays.keys()) {
 // A pretty useful method to create a delay without blocking the whole script.
 const wait = require('util').promisify(setTimeout);
 
+// Start a cron job that executes a function every hour on the hour.
+// NOTE(teejusb): Currently an hour poller is excessive, but it's to handle
+// future features.
+const hourPoller = cron.job('0 0 * * * *', function() {
+  const curDate = new Date();
+  // If it's Monday at 12 PM PST, post a new PUG poll.
+  if (curDate.getHours() === 12) {
+    if (curDate.getDay() === 1) {
+      const oneWeekFromNow = new Date();
+      oneWeekFromNow.setDate(curDate().getDate() + 7);
+
+      let pugPollText = '**PUG Availability Poll for ';
+      if (curDate.getMonth() == oneWeekFromNow.getMonth()) {
+        // E.g. Jan 7-13
+        pugPollText +=
+            `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
+            `${curDate.getDate()}-${oneWeekFromNow.getDate()}`;
+      } else {
+        // E.g. Jan 31-Feb 6
+        pugPollText +=
+            `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
+            `${curDate.getDate()}-` +
+            `${oneWeekFromNow.toLocaleString('en-us', {month: 'short'})} ` +
+            `${oneWeekFromNow.getDate()}**\n`;
+      }
+
+      pugPollText +=
+          'Please vote with your availibility with the following reactions ' +
+          '(generally 8PM PST):\n' +
+          '\n'+
+          '🇲 - Monday\n' +
+          '🇹 - Tuesday\n' +
+          '🇼 - Wednesday\n' +
+          '🇷 - Thursday\n' +
+          '🇫 - Friday\n' +
+          '🇸 - Saturday\n' +
+          '🇺 - Sunday\n';
+
+      const pugPollChannel = client.channels.get(pugPollChannelId);
+      pugPollChannel.send(pugPollText);
+    }
+  }
+});
+hourPoller.start();
+
 // ================ Once on Startup ================
 
 client.once('ready', () => {
@@ -132,7 +179,7 @@ client.on('messageReactionAdd', (messageReaction, user) => {
   // If we can't find the current PUG poll for whatever reason, return early.
   if (typeof curPugMessage === 'undefined' || curPugMessage === null) return;
 
-  // We only care for reactions to the PUG poll.
+  // We only care for reactions to the current PUG poll.
   if (messageReaction.message.id !== curPugMessage.id) return;
 
   const emojiName = messageReaction.emoji.name;
@@ -172,7 +219,7 @@ client.on('guildMemberAdd', (member) => {
     const invite = guildInvites.get(guestCode);
     if (invite) {
       if (invite.uses == guestUses) {
-        const role = member.guild.roles.find((r) => r.name === 'Member');
+        const role = member.guild.roles.find((r) => r.name === 'TempRole');
         member.addRole(role, 'Auto-added via bot.');
       } else {
         guestUses = invite.uses;
@@ -189,7 +236,7 @@ client.on('message', (message) => {
     // Only the poll should be posted in this channel.
     // If a new poll was posted then reset the PUG poll variables.
     curPugMessage = message;
-    for (const emojiName of valid_days.keys()) {
+    for (const emojiName of validDays.keys()) {
       maxDayCounts.set(emojiName, 0);
     }
     console.log('New PUG poll was posted.');
@@ -255,5 +302,9 @@ client.on('message', (message) => {
     message.reply('there was an error trying to execute that command!');
   }
 });
+
+client.on('error', (e) => console.error(e));
+client.on('warn', (e) => console.warn(e));
+client.on('debug', (e) => console.info(e));
 
 client.login(token);
