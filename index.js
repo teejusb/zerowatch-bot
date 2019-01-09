@@ -28,42 +28,6 @@ const cooldowns = new Discord.Collection();
 // This is used to let the bot automatically assign roles if necessary.
 let guestUses = 0;
 
-const increment = (map, key) => {
-  if (map.has(key)) {
-    map.set(key, map.get(key) + 1);
-  } else {
-    map.set(key, 1);
-  }
-};
-
-const getDayReactions = (map, message) => {
-  for (const reaction of message.reactions.values()) {
-    switch (reaction.emoji.name) {
-      case '🇲':
-        increment(map, '🇲');
-        break;
-      case '🇹':
-        increment(map, '🇹');
-        break;
-      case '🇼':
-        increment(map, '🇼');
-        break;
-      case '🇷':
-        increment(map, '🇷');
-        break;
-      case '🇫':
-        increment(map, '🇫');
-        break;
-      case '🇸':
-        increment(map, '🇸');
-        break;
-      case '🇺':
-        increment(map, '🇺');
-        break;
-    }
-  }
-};
-
 const validDays = new Map();
 validDays.set('🇲', 'Monday');
 validDays.set('🇹', 'Tuesday');
@@ -75,10 +39,6 @@ validDays.set('🇺', 'Sunday');
 
 // Keep track of current PUG poll information.
 let curPugMessage;
-const maxDayCounts = new Map();
-for (const emojiName of validDays.keys()) {
-  maxDayCounts.set(emojiName, 0);
-}
 
 // A pretty useful method to create a delay without blocking the whole script.
 const wait = require('util').promisify(setTimeout);
@@ -162,12 +122,10 @@ client.once('ready', () => {
       pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
           .then((message) => {
             curPugMessage = message;
-            getDayReactions(maxDayCounts, message);
             console.log('Found PUG message!');
           });
     }
   }
-
 
   console.log('Ready!');
 });
@@ -190,26 +148,41 @@ client.on('messageReactionAdd', (messageReaction, user) => {
     messageReaction.remove(user);
     return;
   }
-  // We use maxDayCounts to ensure we only send each of the following
-  // messages once for each of the days. Members can technically add/remove
-  // reactions as they wish so we try and do something about that.
-  // TODO(teejusb): If a user removes a reaction after we already said that
-  // PUGs are on, we should handle that. Figure out a clean way to do this
-  // that also minimizes spam.
+
+  // If we hit 12, then that means we incremented from 11.
   // TODO(teejusb): It would be cool if we only sent these messages on the day
   // they were meant for, but that requires us to keep track of what day it is
   // and when it changes.
-  const curCount = maxDayCounts.get(emojiName);
-  if (messageReaction.count > curCount) {
-    maxDayCounts.set(emojiName, messageReaction.count);
-
+  if (messageReaction.count === 12) {
     const pugAnnounce = client.channels.get(pugAnnounceChannelId);
-
-    if (messageReaction.count === 12) {
-      pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
-    }
+    pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
   }
 });
+
+// ================ On messageReactionRemove ================
+// Handler for when members remove reactions to the PUG poll.
+
+client.on('messageReactionRemove', (messageReaction, user) => {
+  // If we can't find the current PUG poll for whatever reason, return early.
+  if (typeof curPugMessage === 'undefined' || curPugMessage === null) return;
+
+  // We only care for reactions to the current PUG poll.
+  if (messageReaction.message.id !== curPugMessage.id) return;
+
+  // If a bot removed the reaction, we can return early.
+  if (user.bot) return;
+
+  const emojiName = messageReaction.emoji.name;
+
+  // If we dropped below the threshold then notify users that we've lost quorum
+  // for that day. If we hit 11, then that means we decremented from 12.
+  if (messageReaction.count === 11) {
+    const pugAnnounce = client.channels.get(pugAnnounceChannelId);
+    pugAnnounce.send(
+        `We no longer have enough for PUGs on ${validDays.get(emojiName)} :(`);
+  }
+});
+
 
 // ================ On guildMemberAdd ================
 // Handler for when new members join the server.
@@ -236,9 +209,6 @@ client.on('message', (message) => {
     // Only the poll should be posted in this channel.
     // If a new poll was posted then reset the PUG poll variables.
     curPugMessage = message;
-    for (const emojiName of validDays.keys()) {
-      maxDayCounts.set(emojiName, 0);
-    }
     console.log('New PUG poll was posted.');
     return;
   }
