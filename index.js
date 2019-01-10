@@ -52,14 +52,14 @@ const hourPoller = cron.job('0 0 * * * *', function() {
   if (curDate.getHours() === 12) {
     if (curDate.getDay() === 1) {
       const oneWeekFromNow = new Date();
-      oneWeekFromNow.setDate(curDate().getDate() + 7);
+      oneWeekFromNow.setDate(curDate.getDate() + 7);
 
       let pugPollText = '**PUG Availability Poll for ';
       if (curDate.getMonth() == oneWeekFromNow.getMonth()) {
         // E.g. Jan 7-13
         pugPollText +=
             `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
-            `${curDate.getDate()}-${oneWeekFromNow.getDate()}`;
+            `${curDate.getDate()}-${oneWeekFromNow.getDate()}**\n`;
       } else {
         // E.g. Jan 31-Feb 6
         pugPollText +=
@@ -82,7 +82,29 @@ const hourPoller = cron.job('0 0 * * * *', function() {
           '🇺 - Sunday\n';
 
       const pugPollChannel = client.channels.get(pugPollChannelId);
-      pugPollChannel.send(pugPollText);
+      if (pugPollChannel) {
+         // Delete the previous PUG poll and post the new one.
+        pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
+            .then((message) => {
+              message.delete();
+            });
+        pugPollChannel.send(pugPollText);
+      } else {
+        console.log(
+          "ERROR: Could not find PUG poll channel when creating new poll.");
+      }
+
+      // Delete all messages in the PUG announce channel to minimize clutter.
+      const pugAnnounceChannel = client.channels.get(pugAnnounceChannelId);
+      if (pugAnnounceChannel) {
+      pugAnnounceChannel.fetchMessages()
+          .then((fetchedMessages) => {
+            pugAnnounceChannel.bulkDelete(fetchedMessages);
+          });
+      } else {
+        console.log(
+          "ERROR: Could not find PUG announce channel.");
+      }
     }
   }
 });
@@ -252,8 +274,16 @@ client.on('message', (message) => {
 
     if (now < expirationTime) {
       const timeLeft = (expirationTime - now) / 1000;
-      return message.reply(`please wait ${timeLeft.toFixed(1)} more second(s) `
-                         + `before reusing the \`${command.name}\` command.`);
+      if (timeLeft > 60) {
+        timeLeft /= 60;
+        return message.reply(
+            `please wait ${timeLeft.toFixed(1)} more minute(s) `
+          + `before reusing the \`${command.name}\` command.`);
+      } else {
+        return message.reply(
+            `please wait ${timeLeft.toFixed(1)} more second(s) `
+          + `before reusing the \`${command.name}\` command.`);
+      }
     }
   }
 
@@ -269,8 +299,8 @@ client.on('message', (message) => {
   }
 });
 
-client.on('error', (e) => console.error(e));
-client.on('warn', (e) => console.warn(e));
-client.on('debug', (e) => console.info(e));
+client.on('error', (e) => console.error('ERROR: ' + e));
+client.on('warn', (e) => console.warn(' WARN: ' + e));
+client.on('debug', (e) => console.info('DEBUG: ' + e));
 
 client.login(token);
