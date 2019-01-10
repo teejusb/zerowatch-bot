@@ -5,8 +5,8 @@ const Discord = require('discord.js');
 // TODO(teejusb): This is going to get unruly real quick. We might just want
 // to load this as 'config' and access the members individually, or find a
 // nicer way to specify many members.
-const {prefix, token, guildId, guestCode, testChannel,
-  pugPollChannelId, pugAnnounceChannelId} =
+const {prefix, token, guildId, guestCode, pugPollChannelId,
+  pugAnnounceChannelId} =
       require('./config.json');
 
 const client = new Discord.Client();
