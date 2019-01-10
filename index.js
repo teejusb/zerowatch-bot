@@ -99,7 +99,6 @@ client.once('ready', () => {
 
   // Get all the invites from the Zerowatch discord.
   const guild = client.guilds.get(guildId);
-
   if (guild) {
     guild.fetchInvites()
         .then((guildInvites) => {
@@ -217,9 +216,6 @@ client.on('message', (message) => {
   // prefixed appropriatly.
   if (!message.content.startsWith(prefix) ||
       message.author.bot) return;
-
-  // Temporary, limit commands to a single channel.
-  if (message.channel.name !== testChannel) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();

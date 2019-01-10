@@ -18,6 +18,6 @@ module.exports = {
 
     const rolled = Math.floor(Math.random() * (max - min + 1)) + min;
 
-    message.channel.send(`${message.author.username} rolled a ${rolled}.`);
+    message.channel.send(`${message.author.toString()} rolled a ${rolled}.`);
   },
 };
