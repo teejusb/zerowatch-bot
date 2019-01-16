@@ -69,7 +69,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
 
       pugPollText +=
           'Please vote with your availibility with the following reactions ' +
-          '(generally 8PM PST):\n' +
+          '(generally 8PM PST). Feel free to add/remove votes over the ' +
+          'week but please refrain from removing votes the day of:\n' +
           '\n'+
           '🇲 - Monday\n' +
           '🇹 - Tuesday\n' +
@@ -134,7 +135,9 @@ const hourPoller = cron.job('0 0 * * * *', function() {
                 client.channels.get(config.pugAnnounceChannelId);
             pugAnnounce.send(
                 `PUGs are happening today `
-              + `(${validDays.get(days[curDate.getDay()])}) in 3 hours!`);
+              + `(${validDays.get(days[curDate.getDay()])}) in 3 hours! `
+              + `Please mark your availability over at `
+              + `https:\/\/zerowatch-pugs.firebaseapp.com/`);
           }
         });
       }
@@ -211,7 +214,7 @@ client.on('messageReactionAdd', async (messageReaction, user) => {
   // Only post these messages between 5PM PST and 8PM PST to minimize spam.
   // 8PM PST is the usual start time for PUGs.
   const curDate = new Date();
-  if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
+  if (17 <= curDate.getHours() && curDate.getHours() <= 20) {
     const reactedUsers = await messageReaction.fetchUsers();
     if (reactedUsers.size === 12) {
       const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
@@ -245,7 +248,7 @@ client.on('messageReactionRemove', async (messageReaction, user) => {
   // Only post these messages between 5PM PST and 8PM PST to minimize spam.
   // 8PM PST is the usual start time for PUGs.
   const curDate = new Date();
-  if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
+  if (17 <= curDate.getHours() && curDate.getHours() <= 20) {
     const reactedUsers = await messageReaction.fetchUsers();
     if (reactedUsers.size === 11) {
       const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
@@ -326,7 +329,7 @@ client.on('message', (message) => {
     const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
 
     if (now < expirationTime) {
-      const timeLeft = (expirationTime - now) / 1000;
+      let timeLeft = (expirationTime - now) / 1000;
       if (timeLeft > 60) {
         timeLeft /= 60;
         return message.reply(
@@ -352,8 +355,8 @@ client.on('message', (message) => {
   }
 });
 
-client.on('error', (e) => console.error('ERROR: ' + e));
-client.on('warn', (e) => console.warn(' WARN: ' + e));
+client.on('error', (e) => console.error(e.name + ': ' + e.message));
+client.on('warn', (e) => console.warn(e.name + ': ' + e.message));
 client.on('debug', (e) => {});
 
 client.login(token);
