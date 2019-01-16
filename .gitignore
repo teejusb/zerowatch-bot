@@ -1,3 +1,6 @@
+# Private config file
+config_private.json
+
 # Logs
 logs
 *.log
@@ -83,4 +86,3 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
-config_private.json
