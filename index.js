@@ -3,17 +3,6 @@ const Discord = require('discord.js');
 // TODO(aalberg): Use JSON.parse and maybe some more complex handling here.
 const {token} = require('./config_private.json');
 const config = require('./config.json');
-// Find the active set of per-guild settings.
-let activeConfig = null;
-for (guildSettings of config.perGuildSettings) {
-  if (guildSettings.guildId === config.activeGuild) {
-    activeConfig = guildSettings;
-  }
-}
-if (activeConfig == null) {
-  console.log('No settings found for guild: ' + config.activeGuild);
-  process.exit(1);
-}
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -99,7 +88,7 @@ client.once('ready', () => {
   wait(1000);
 
   // Get all the invites from the Zerowatch discord.
-  const guild = client.guilds.get(activeConfig.guildId);
+  const guild = client.guilds.get(config.guildId);
 
   if (guild) {
     guild.fetchInvites()
@@ -109,14 +98,14 @@ client.once('ready', () => {
             console.log(
                 `  Available invite code ${code} with ${invite.uses} uses`);
             // Only need to keep track of guest invite usages.
-            if (code === activeConfig.guestCode) {
+            if (code === config.guestCode) {
               guestUses = invite.uses;
             }
           }
         });
   }
 
-  const pugPollChannel = client.channels.get(activeConfig.pugPollChannelId);
+  const pugPollChannel = client.channels.get(config.pugPollChannelId);
   if (pugPollChannel) {
     if (pugPollChannel.lastMessageID) {
       // The last message posted is the current poll.
@@ -163,7 +152,7 @@ client.on('messageReactionAdd', (messageReaction, user) => {
   if (messageReaction.count > curCount) {
     maxDayCounts.set(emojiName, messageReaction.count);
 
-    const pugAnnounce = client.channels.get(activeConfig.pugAnnounceChannelId);
+    const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
 
     if (messageReaction.count === 12) {
       pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
@@ -176,7 +165,7 @@ client.on('messageReactionAdd', (messageReaction, user) => {
 
 client.on('guildMemberAdd', (member) => {
   member.guild.fetchInvites().then((guildInvites) => {
-    const invite = guildInvites.get(activeConfig.guestCode);
+    const invite = guildInvites.get(config.guestCode);
     if (invite) {
       if (invite.uses == guestUses) {
         const role = member.guild.roles.find((r) => r.name === 'Member');
@@ -192,7 +181,7 @@ client.on('guildMemberAdd', (member) => {
 // Handler for responding to messages (a la slackbot).
 
 client.on('message', (message) => {
-  if (message.channel.id === activeConfig.pugPollChannelId) {
+  if (message.channel.id === config.pugPollChannelId) {
     // Only the poll should be posted in this channel.
     // If a new poll was posted then reset the PUG poll variables.
     curPugMessage = message;
@@ -209,7 +198,7 @@ client.on('message', (message) => {
       message.author.bot) return;
 
   // Temporary, limit commands to a single channel.
-  if (message.channel.name !== activeConfig.testChannel) return;
+  if (message.channel.name !== config.testChannel) return;
 
   // Regex soup from: https://stackoverflow.com/a/25663729
   const args = message.content.slice(config.prefix.length).trim()
