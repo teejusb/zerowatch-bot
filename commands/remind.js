@@ -42,12 +42,12 @@ module.exports = {
       }
 
       if (toRemindUsers.size > 0) {
-        messageText = "";
+        messageText = '';
         for (const user of toRemindUsers.values()) {
-          if (messageText.length > 0) messageText += ", ";
+          if (messageText.length > 0) messageText += ', ';
           messageText += user.toString();
         }
-        messageText += ", we're waiting for you for PUGs! :D";
+        messageText += ', we\'re waiting for you for PUGs! :D';
 
         message.channel.send(messageText);
       }

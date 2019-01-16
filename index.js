@@ -93,7 +93,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       }
 
       // Delete all messages in the PUG announce channel to minimize clutter.
-      const pugAnnounceChannel = client.channels.get(config.pugAnnounceChannelId);
+      const pugAnnounceChannel =
+          client.channels.get(config.pugAnnounceChannelId);
       if (pugAnnounceChannel) {
         pugAnnounceChannel.fetchMessages()
             .then((fetchedMessages) => {
@@ -129,7 +130,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       if (reaction.emoji.name === days[curDate.getDay()]) {
         reaction.fetchUsers().then((reactedUsers) => {
           if (reactedUsers.size >= 12) {
-            const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
+            const pugAnnounce =
+                client.channels.get(config.pugAnnounceChannelId);
             pugAnnounce.send(
                 `PUGs are happening today `
               + `(${validDays.get(days[curDate.getDay()])}) in 3 hours!`);
