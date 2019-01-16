@@ -2,12 +2,9 @@ const fs = require('fs');
 const cron = require('cron');
 const Discord = require('discord.js');
 
-// TODO(teejusb): This is going to get unruly real quick. We might just want
-// to load this as 'config' and access the members individually, or find a
-// nicer way to specify many members.
-const {prefix, token, guildId, guestCode, pugPollChannelId,
-  pugAnnounceChannelId} =
-      require('./config.json');
+// TODO(aalberg): Use JSON.parse and maybe some more complex handling here.
+const {token} = require('./config_private.json');
+const config = require('./config.json');
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -82,7 +79,7 @@ const hourPoller = cron.job('0 0 * * * *', function() {
           '🇸 - Saturday\n' +
           '🇺 - Sunday\n';
 
-      const pugPollChannel = client.channels.get(pugPollChannelId);
+      const pugPollChannel = client.channels.get(config.pugPollChannelId);
       if (pugPollChannel) {
         // Delete the previous PUG poll and post the new one.
         pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
@@ -96,7 +93,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       }
 
       // Delete all messages in the PUG announce channel to minimize clutter.
-      const pugAnnounceChannel = client.channels.get(pugAnnounceChannelId);
+      const pugAnnounceChannel =
+          client.channels.get(config.pugAnnounceChannelId);
       if (pugAnnounceChannel) {
         pugAnnounceChannel.fetchMessages()
             .then((fetchedMessages) => {
@@ -109,7 +107,7 @@ const hourPoller = cron.job('0 0 * * * *', function() {
     }
   } else if (curDate.getHours() === 17) {
     // Refetch the PUG poll to get updated values.
-    const pugPollChannel = client.channels.get(pugPollChannelId);
+    const pugPollChannel = client.channels.get(config.pugPollChannelId);
     if (pugPollChannel) {
       if (pugPollChannel.lastMessageID) {
         // The last message posted is the current poll.
@@ -132,7 +130,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       if (reaction.emoji.name === days[curDate.getDay()]) {
         reaction.fetchUsers().then((reactedUsers) => {
           if (reactedUsers.size >= 12) {
-            const pugAnnounce = client.channels.get(pugAnnounceChannelId);
+            const pugAnnounce =
+                client.channels.get(config.pugAnnounceChannelId);
             pugAnnounce.send(
                 `PUGs are happening today `
               + `(${validDays.get(days[curDate.getDay()])}) in 3 hours!`);
@@ -154,7 +153,7 @@ client.once('ready', () => {
   wait(1000);
 
   // Get all the invites from the Zerowatch discord.
-  const guild = client.guilds.get(guildId);
+  const guild = client.guilds.get(config.guildId);
   if (guild) {
     guild.fetchInvites()
         .then((guildInvites) => {
@@ -163,14 +162,14 @@ client.once('ready', () => {
             console.log(
                 `  Available invite code ${code} with ${invite.uses} uses`);
             // Only need to keep track of guest invite usages.
-            if (code === guestCode) {
+            if (code === config.guestCode) {
               guestUses = invite.uses;
             }
           }
         });
   }
 
-  const pugPollChannel = client.channels.get(pugPollChannelId);
+  const pugPollChannel = client.channels.get(config.pugPollChannelId);
   if (pugPollChannel) {
     if (pugPollChannel.lastMessageID) {
       // The last message posted is the current poll.
@@ -203,7 +202,6 @@ client.on('messageReactionAdd', async (messageReaction, user) => {
     messageReaction.remove(user);
     return;
   }
-
   console.log(`${user.username} has responded to PUGs `
             + `for ${validDays.get(emojiName)}`);
 
@@ -216,7 +214,7 @@ client.on('messageReactionAdd', async (messageReaction, user) => {
   if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
     const reactedUsers = await messageReaction.fetchUsers();
     if (reactedUsers.size === 12) {
-      const pugAnnounce = client.channels.get(pugAnnounceChannelId);
+      const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
       pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
     }
   }
@@ -250,7 +248,7 @@ client.on('messageReactionRemove', async (messageReaction, user) => {
   if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
     const reactedUsers = await messageReaction.fetchUsers();
     if (reactedUsers.size === 11) {
-      const pugAnnounce = client.channels.get(pugAnnounceChannelId);
+      const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
       pugAnnounce.send(`We no longer have enough for PUGs `
                      + `on ${validDays.get(emojiName)} :(`);
     }
@@ -263,7 +261,7 @@ client.on('messageReactionRemove', async (messageReaction, user) => {
 
 client.on('guildMemberAdd', (member) => {
   member.guild.fetchInvites().then((guildInvites) => {
-    const invite = guildInvites.get(guestCode);
+    const invite = guildInvites.get(config.guestCode);
     if (invite) {
       if (invite.uses == guestUses) {
         const role = member.guild.roles.find((r) => r.name === 'TempRole');
@@ -279,7 +277,7 @@ client.on('guildMemberAdd', (member) => {
 // Handler for responding to messages (a la slackbot).
 
 client.on('message', (message) => {
-  if (message.channel.id === pugPollChannelId) {
+  if (message.channel.id === config.pugPollChannelId) {
     // Only the poll should be posted in this channel.
     // If a new poll was posted then reset the PUG poll variables.
     curPugMessage = message;
@@ -288,11 +286,13 @@ client.on('message', (message) => {
   }
 
   // Only respond to messages sent from real users and those that are
-  // prefixed appropriatly.
-  if (!message.content.startsWith(prefix) ||
+  // config.prefixed appropriatly.
+  if (!message.content.startsWith(config.prefix) ||
       message.author.bot) return;
 
-  const args = message.content.slice(prefix.length).trim().split(/ +/);
+  // Regex soup from: https://stackoverflow.com/a/25663729
+  const args = message.content.slice(config.prefix.length).trim()
+      .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g);
   const commandName = args.shift().toLowerCase();
 
   const command = client.commands.get(commandName) ||
@@ -308,7 +308,7 @@ client.on('message', (message) => {
 
     if (command.usage) {
       reply += '\nThe proper usage would be: ';
-      reply += `\`${prefix}${command.name} ${command.usage}\``;
+      reply += `\`${config.prefix}${command.name} ${command.usage}\``;
     }
     return message.channel.send(reply);
   }
