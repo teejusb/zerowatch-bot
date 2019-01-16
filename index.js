@@ -1,5 +1,7 @@
 const fs = require('fs');
+const cron = require('cron');
 const Discord = require('discord.js');
+
 // TODO(aalberg): Use JSON.parse and maybe some more complex handling here.
 const {token} = require('./config_private.json');
 const config = require('./config.json');
@@ -23,42 +25,6 @@ const cooldowns = new Discord.Collection();
 // This is used to let the bot automatically assign roles if necessary.
 let guestUses = 0;
 
-const increment = (map, key) => {
-  if (map.has(key)) {
-    map.set(key, map.get(key) + 1);
-  } else {
-    map.set(key, 1);
-  }
-};
-
-const getDayReactions = (map, message) => {
-  for (const reaction of message.reactions.values()) {
-    switch (reaction.emoji.name) {
-      case '🇲':
-        increment(map, '🇲');
-        break;
-      case '🇹':
-        increment(map, '🇹');
-        break;
-      case '🇼':
-        increment(map, '🇼');
-        break;
-      case '🇷':
-        increment(map, '🇷');
-        break;
-      case '🇫':
-        increment(map, '🇫');
-        break;
-      case '🇸':
-        increment(map, '🇸');
-        break;
-      case '🇺':
-        increment(map, '🇺');
-        break;
-    }
-  }
-};
-
 const validDays = new Map();
 validDays.set('🇲', 'Monday');
 validDays.set('🇹', 'Tuesday');
@@ -70,13 +36,110 @@ validDays.set('🇺', 'Sunday');
 
 // Keep track of current PUG poll information.
 let curPugMessage;
-const maxDayCounts = new Map();
-for (const emojiName of validDays.keys()) {
-  maxDayCounts.set(emojiName, 0);
-}
 
 // A pretty useful method to create a delay without blocking the whole script.
 const wait = require('util').promisify(setTimeout);
+
+// Start a cron job that executes a function every hour on the hour.
+// Currently we use this to:
+//  - Post the new PUG poll every Monday at 9AM PST.
+//  - Check the current votes to see if we have quorum at 5PM PST.
+const hourPoller = cron.job('0 0 * * * *', function() {
+  const curDate = new Date();
+  if (curDate.getHours() === 9) {
+    // If it's Monday at 9 AM PST, post a new PUG poll.
+    if (curDate.getDay() === 1) {
+      const oneWeekFromNow = new Date();
+      oneWeekFromNow.setDate(curDate.getDate() + 7);
+
+      let pugPollText = '**PUG Availability Poll for ';
+      if (curDate.getMonth() == oneWeekFromNow.getMonth()) {
+        // E.g. Jan 7-13
+        pugPollText +=
+            `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
+            `${curDate.getDate()}-${oneWeekFromNow.getDate()}**\n`;
+      } else {
+        // E.g. Jan 31-Feb 6
+        pugPollText +=
+            `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
+            `${curDate.getDate()}-` +
+            `${oneWeekFromNow.toLocaleString('en-us', {month: 'short'})} ` +
+            `${oneWeekFromNow.getDate()}**\n`;
+      }
+
+      pugPollText +=
+          'Please vote with your availibility with the following reactions ' +
+          '(generally 8PM PST):\n' +
+          '\n'+
+          '🇲 - Monday\n' +
+          '🇹 - Tuesday\n' +
+          '🇼 - Wednesday\n' +
+          '🇷 - Thursday\n' +
+          '🇫 - Friday\n' +
+          '🇸 - Saturday\n' +
+          '🇺 - Sunday\n';
+
+      const pugPollChannel = client.channels.get(config.pugPollChannelId);
+      if (pugPollChannel) {
+        // Delete the previous PUG poll and post the new one.
+        pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
+            .then((message) => {
+              message.delete();
+            });
+        pugPollChannel.send(pugPollText);
+      } else {
+        console.log(
+            'ERROR: Could not find PUG poll channel when creating new poll.');
+      }
+
+      // Delete all messages in the PUG announce channel to minimize clutter.
+      const pugAnnounceChannel = client.channels.get(config.pugAnnounceChannelId);
+      if (pugAnnounceChannel) {
+        pugAnnounceChannel.fetchMessages()
+            .then((fetchedMessages) => {
+              pugAnnounceChannel.bulkDelete(fetchedMessages);
+            });
+      } else {
+        console.log(
+            'ERROR: Could not find PUG announce channel.');
+      }
+    }
+  } else if (curDate.getHours() === 17) {
+    // Refetch the PUG poll to get updated values.
+    const pugPollChannel = client.channels.get(config.pugPollChannelId);
+    if (pugPollChannel) {
+      if (pugPollChannel.lastMessageID) {
+        // The last message posted is the current poll.
+        pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
+            .then((message) => {
+              if (curPugMessage.id === message.id) {
+                curPugMessage = message;
+              } else {
+                console.log('ERROR: Hmm found a different PUG poll.');
+              }
+            });
+      }
+    } else {
+      console.log('ERROR: Couldn\'t find PUG poll channel.');
+    }
+    // At 5 PM PST on every day, determine if we have enough for PUGs today.
+    // curDate.getDay() is 0-indexed where 0 = Sunday.
+    const days = ['🇺', '🇲', '🇹', '🇼', '🇷', '🇫', '🇸'];
+    for (const reaction of curPugMessage.reactions.values()) {
+      if (reaction.emoji.name === days[curDate.getDay()]) {
+        reaction.fetchUsers().then((reactedUsers) => {
+          if (reactedUsers.size >= 12) {
+            const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
+            pugAnnounce.send(
+                `PUGs are happening today `
+              + `(${validDays.get(days[curDate.getDay()])}) in 3 hours!`);
+          }
+        });
+      }
+    }
+  }
+});
+hourPoller.start();
 
 // ================ Once on Startup ================
 
@@ -89,7 +152,6 @@ client.once('ready', () => {
 
   // Get all the invites from the Zerowatch discord.
   const guild = client.guilds.get(config.guildId);
-
   if (guild) {
     guild.fetchInvites()
         .then((guildInvites) => {
@@ -112,7 +174,6 @@ client.once('ready', () => {
       pugPollChannel.fetchMessage(pugPollChannel.lastMessageID)
           .then((message) => {
             curPugMessage = message;
-            getDayReactions(maxDayCounts, message);
             console.log('Found PUG message!');
           });
     }
@@ -124,11 +185,11 @@ client.once('ready', () => {
 // ================ On messageReactionAdd ================
 // Handler for when members react to the PUG poll.
 
-client.on('messageReactionAdd', (messageReaction, user) => {
+client.on('messageReactionAdd', async (messageReaction, user) => {
   // If we can't find the current PUG poll for whatever reason, return early.
   if (typeof curPugMessage === 'undefined' || curPugMessage === null) return;
 
-  // We only care for reactions to the PUG poll.
+  // We only care for reactions to the current PUG poll.
   if (messageReaction.message.id !== curPugMessage.id) return;
 
   const emojiName = messageReaction.emoji.name;
@@ -139,26 +200,59 @@ client.on('messageReactionAdd', (messageReaction, user) => {
     messageReaction.remove(user);
     return;
   }
-  // We use maxDayCounts to ensure we only send each of the following
-  // messages once for each of the days. Members can technically add/remove
-  // reactions as they wish so we try and do something about that.
-  // TODO(teejusb): If a user removes a reaction after we already said that
-  // PUGs are on, we should handle that. Figure out a clean way to do this
-  // that also minimizes spam.
-  // TODO(teejusb): It would be cool if we only sent these messages on the day
-  // they were meant for, but that requires us to keep track of what day it is
-  // and when it changes.
-  const curCount = maxDayCounts.get(emojiName);
-  if (messageReaction.count > curCount) {
-    maxDayCounts.set(emojiName, messageReaction.count);
+  console.log(`${user.username} has responded to PUGs `
+            + `for ${validDays.get(emojiName)}`);
 
-    const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
-
-    if (messageReaction.count === 12) {
+  // If we hit 12, then that means we incremented from 11.
+  // For some reason, sometimes messageReaction.count is wrong. We'll just
+  // actively fetch the users and get the size from there.
+  // Only post these messages between 5PM PST and 8PM PST to minimize spam.
+  // 8PM PST is the usual start time for PUGs.
+  const curDate = new Date();
+  if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
+    const reactedUsers = await messageReaction.fetchUsers();
+    if (reactedUsers.size === 12) {
+      const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
       pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
     }
   }
 });
+
+// ================ On messageReactionRemove ================
+// Handler for when members remove reactions to the PUG poll.
+
+client.on('messageReactionRemove', async (messageReaction, user) => {
+  // If we can't find the current PUG poll for whatever reason, return early.
+  if (typeof curPugMessage === 'undefined' || curPugMessage === null) return;
+
+  // We only care for reactions to the current PUG poll.
+  if (messageReaction.message.id !== curPugMessage.id) return;
+
+  // If a bot removed the reaction, we can return early.
+  if (user.bot) return;
+
+  const emojiName = messageReaction.emoji.name;
+
+  console.log(`${user.username} has removed their PUG vote `
+            + `for ${validDays.get(emojiName)}`);
+
+  // If we dropped below the threshold then notify users that we've lost quorum
+  // for that day. If we hit 11, then that means we decremented from 12.
+  // For some reason, sometimes messageReaction.count is wrong. We'll just
+  // actively fetch the users and get the size from there.
+  // Only post these messages between 5PM PST and 8PM PST to minimize spam.
+  // 8PM PST is the usual start time for PUGs.
+  const curDate = new Date();
+  if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
+    const reactedUsers = await messageReaction.fetchUsers();
+    if (reactedUsers.size === 11) {
+      const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
+      pugAnnounce.send(`We no longer have enough for PUGs `
+                     + `on ${validDays.get(emojiName)} :(`);
+    }
+  }
+});
+
 
 // ================ On guildMemberAdd ================
 // Handler for when new members join the server.
@@ -168,7 +262,7 @@ client.on('guildMemberAdd', (member) => {
     const invite = guildInvites.get(config.guestCode);
     if (invite) {
       if (invite.uses == guestUses) {
-        const role = member.guild.roles.find((r) => r.name === 'Member');
+        const role = member.guild.roles.find((r) => r.name === 'TempRole');
         member.addRole(role, 'Auto-added via bot.');
       } else {
         guestUses = invite.uses;
@@ -185,9 +279,6 @@ client.on('message', (message) => {
     // Only the poll should be posted in this channel.
     // If a new poll was posted then reset the PUG poll variables.
     curPugMessage = message;
-    for (const emojiName of valid_days.keys()) {
-      maxDayCounts.set(emojiName, 0);
-    }
     console.log('New PUG poll was posted.');
     return;
   }
@@ -196,9 +287,6 @@ client.on('message', (message) => {
   // config.prefixed appropriatly.
   if (!message.content.startsWith(config.prefix) ||
       message.author.bot) return;
-
-  // Temporary, limit commands to a single channel.
-  if (message.channel.name !== config.testChannel) return;
 
   // Regex soup from: https://stackoverflow.com/a/25663729
   const args = message.content.slice(config.prefix.length).trim()
@@ -237,8 +325,16 @@ client.on('message', (message) => {
 
     if (now < expirationTime) {
       const timeLeft = (expirationTime - now) / 1000;
-      return message.reply(`please wait ${timeLeft.toFixed(1)} more second(s) `
-                         + `before reusing the \`${command.name}\` command.`);
+      if (timeLeft > 60) {
+        timeLeft /= 60;
+        return message.reply(
+            `please wait ${timeLeft.toFixed(1)} more minute(s) `
+          + `before reusing the \`${command.name}\` command.`);
+      } else {
+        return message.reply(
+            `please wait ${timeLeft.toFixed(1)} more second(s) `
+          + `before reusing the \`${command.name}\` command.`);
+      }
     }
   }
 
@@ -253,5 +349,9 @@ client.on('message', (message) => {
     message.reply('there was an error trying to execute that command!');
   }
 });
+
+client.on('error', (e) => console.error('ERROR: ' + e));
+client.on('warn', (e) => console.warn(' WARN: ' + e));
+client.on('debug', (e) => {});
 
 client.login(token);

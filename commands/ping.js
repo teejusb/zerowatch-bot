@@ -3,6 +3,10 @@ module.exports = {
   cooldown: 5,
   description: 'Ping!',
   execute(message, args) {
-    message.channel.send('Pong.');
+    if (!args.length) {
+      message.channel.send('Pong.');
+    } else {
+      message.channel.send('Pong: ' + args);
+    }
   },
 };
