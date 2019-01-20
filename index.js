@@ -103,7 +103,16 @@ const hourPoller = cron.job('0 0 * * * *', function() {
 
       const pugPollChannel = client.channels.get(config.pugPollChannelId);
       if (pugPollChannel) {
-        pugPollChannel.send(pugPollText);
+        pugPollChannel.send(pugPollText).then(async (message) => {
+          // Let the bot add reactions in order on the poll.
+          await message.react('🇲');
+          await message.react('🇹');
+          await message.react('🇼');
+          await message.react('🇷');
+          await message.react('🇫');
+          await message.react('🇸');
+          await message.react('🇺');
+        });
       } else {
         console.log(
             'ERROR: Could not find PUG poll channel when creating new poll.');
@@ -256,16 +265,27 @@ const messageReactionResponse = async (
             + `for ${validDays.get(emojiName)}`);
   }
 
+  // messageReaction.count can be wrong because of caching. We'll just
+  // actively fetch the users and get the size from there.
+  const reactedUsers = await messageReaction.fetchUsers();
+  // When we hit 6 people responding to any specific day on the poll, remove
+  // the bot vote.
+    for (const user of reactedUsers.values()) {
+      if (user.bot) {
+        messageReaction.remove(user);
+      }
+    }
+    // We can return early here since we won't be close to the threshold yet.
+    return;
+  }
+
   const curDate = new Date();
   // curDate.getDay() is 0-indexed where 0 = Sunday.
   const days = ['🇺', '🇲', '🇹', '🇼', '🇷', '🇫', '🇸'];
-  // messageReaction.count can be wrong because of caching. We'll just
-  // actively fetch the users and get the size from there.
   // Only post these messages between 5PM PST and 8PM PST on the day of
   // the PUGs to minimize spam. 8PM PST is the usual start time for PUGs.
   if (days[curDate.getDay()] === emojiName &&
       17 <= curDate.getHours() && curDate.getHours() <= 20) {
-    const reactedUsers = await messageReaction.fetchUsers();
     const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
 
     // If we hit 12, then that means we incremented from 11.
