@@ -270,6 +270,7 @@ const messageReactionResponse = async (
   const reactedUsers = await messageReaction.fetchUsers();
   // When we hit 6 people responding to any specific day on the poll, remove
   // the bot vote.
+  if (mode === 'add' && reactedUsers.size() === 6) {
     for (const user of reactedUsers.values()) {
       if (user.bot) {
         messageReaction.remove(user);
