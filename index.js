@@ -50,7 +50,7 @@ const wait = require('util').promisify(setTimeout);
 //  - Delete the previous poll every Monday at Midnight.
 //  - Post the new PUG poll every Sunday at 12 PM PST.
 //  - Check the current votes to see if we have quorum at 5PM PST.
-const hourPoller = cron.job('0 0 * * * *', function() {
+const hourPoller = cron.job('0 0 * * * *', async function() {
   const curDate = new Date();
   if (curDate.getHours() === 0) {
     // Delete the previous poll on Monday at Midnight.
@@ -61,7 +61,22 @@ const hourPoller = cron.job('0 0 * * * *', function() {
             .then((message) => {
               message.delete();
               prevPugMessage = null;
+              console.log('Deleted previous PUG poll.');
             });
+
+        // Delete all messages in the PUG announce channel to minimize clutter.
+        const pugAnnounceChannel =
+            client.channels.get(config.pugAnnounceChannelId);
+        if (pugAnnounceChannel) {
+          pugAnnounceChannel.fetchMessages()
+              .then((fetchedMessages) => {
+                pugAnnounceChannel.bulkDelete(fetchedMessages);
+                console.log('Cleared PUG announce channel.');
+              });
+        } else {
+          console.log(
+              'ERROR: Could not find PUG announce channel to delete messages from.');
+        }
       } else {
         console.log(
             'ERROR: Could not find PUG poll channel when creating new poll.');
@@ -70,20 +85,24 @@ const hourPoller = cron.job('0 0 * * * *', function() {
   } else if (curDate.getHours() === 12) {
     // If it's Sunday at 12 PM PST, post a new PUG poll.
     if (curDate.getDay() === 0) {
+      // The poll is Monday-Sunday. Since we post a new poll on a day early,
+      // fix the dates appropriately.
+      const tomorrow = new Date();
       const oneWeekFromNow = new Date();
-      oneWeekFromNow.setDate(curDate.getDate() + 7);
+      tomorrow.setDate(curDate.getDate() + 1);
+      oneWeekFromNow.setDate(tomorrow.getDate() + 6);
 
       let pugPollText = '**PUG Availability Poll for ';
-      if (curDate.getMonth() == oneWeekFromNow.getMonth()) {
+      if (tomorrow.getMonth() == oneWeekFromNow.getMonth()) {
         // E.g. Jan 7-13
         pugPollText +=
-            `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
-            `${curDate.getDate()}-${oneWeekFromNow.getDate()}**\n`;
+            `${tomorrow.toLocaleString('en-us', {month: 'short'})} ` +
+            `${tomorrow.getDate()}-${oneWeekFromNow.getDate()}**\n`;
       } else {
         // E.g. Jan 31-Feb 6
         pugPollText +=
-            `${curDate.toLocaleString('en-us', {month: 'short'})} ` +
-            `${curDate.getDate()}-` +
+            `${tomorrow.toLocaleString('en-us', {month: 'short'})} ` +
+            `${tomorrow.getDate()}-` +
             `${oneWeekFromNow.toLocaleString('en-us', {month: 'short'})} ` +
             `${oneWeekFromNow.getDate()}**\n`;
       }
@@ -117,38 +136,16 @@ const hourPoller = cron.job('0 0 * * * *', function() {
         console.log(
             'ERROR: Could not find PUG poll channel when creating new poll.');
       }
-
-      // Delete all messages in the PUG announce channel to minimize clutter.
-      const pugAnnounceChannel =
-          client.channels.get(config.pugAnnounceChannelId);
-      if (pugAnnounceChannel) {
-        pugAnnounceChannel.fetchMessages()
-            .then((fetchedMessages) => {
-              pugAnnounceChannel.bulkDelete(fetchedMessages);
-            });
-      } else {
-        console.log(
-            'ERROR: Could not find PUG announce channel.');
-      }
     }
   } else if (curDate.getHours() === 17) {
     // Refetch the PUG poll to get updated values.
     const pugPollChannel = client.channels.get(config.pugPollChannelId);
     let pugMessage;
     if (pugPollChannel) {
-      let pugMessageId;
       if (exists(prevPugMessage)) {
-        pugMessageId = prevPugMessage.id;
+        pugMessage = await pugPollChannel.fetchMessage(prevPugMessage.id);
       } else if (exists(curPugMessage)) {
-        pugMessageId = curPugMessage.id;
-      }
-
-      if (pugMessageId) {
-        // The last message posted is the current poll.
-        pugPollChannel.fetchMessage(pugMessageId)
-            .then((message) => {
-              pugMessage = message;
-            });
+        pugMessage = await pugPollChannel.fetchMessage(curPugMessage.id);
       }
     } else {
       console.log('ERROR: Couldn\'t find PUG poll channel.');
@@ -160,19 +157,20 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       const days = ['🇺', '🇲', '🇹', '🇼', '🇷', '🇫', '🇸'];
       for (const reaction of pugMessage.reactions.values()) {
         if (reaction.emoji.name === days[curDate.getDay()]) {
-          reaction.fetchUsers().then((reactedUsers) => {
-            if (reactedUsers.size >= 12) {
-              const pugAnnounce =
-                  client.channels.get(config.pugAnnounceChannelId);
-              pugAnnounce.send(
-                  `PUGs are happening today `
-                + `(${validDays.get(days[curDate.getDay()])}) in 3 hours! `
-                + `Please mark your availability over at `
-                + `https:\/\/zerowatch-pugs.firebaseapp.com/`);
-            }
-          });
+          const reactedUsers = await reaction.fetchUsers();
+          if (reactedUsers.size >= 12) {
+            const pugAnnounce =
+                client.channels.get(config.pugAnnounceChannelId);
+            pugAnnounce.send(
+                `PUGs are happening today `
+              + `(${validDays.get(days[curDate.getDay()])}) in 3 hours! `
+              + `Please mark your availability over at `
+              + `https:\/\/zerowatch-pugs.firebaseapp.com/`);
+          }
         }
       }
+    } else {
+      console.log('ERROR: Couldn\'t find current PUG message');
     }
   }
 });
@@ -222,8 +220,11 @@ client.once('ready', () => {
               prevPugMessage = last;
               curPugMessage = first;
             }
+            console.log(`Prev ID is: ${prevPugMessage.id}`);
+            console.log(`Cur ID is: ${curPugMessage.id}`);
           } else {
             curPugMessage = messages.first();
+            console.log(`Cur ID is: ${curPugMessage.id}`);
           }
           console.log(`Found ${messages.size} PUG message(s)!`);
         });
@@ -270,7 +271,7 @@ const messageReactionResponse = async (
   const reactedUsers = await messageReaction.fetchUsers();
   // When we hit 6 people responding to any specific day on the poll, remove
   // the bot vote.
-  if (mode === 'add' && reactedUsers.size() === 6) {
+  if (mode === 'add' && reactedUsers.size === 6) {
     for (const user of reactedUsers.values()) {
       if (user.bot) {
         messageReaction.remove(user);
