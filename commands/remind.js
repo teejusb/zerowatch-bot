@@ -20,8 +20,22 @@ module.exports = {
     });
 
     if (pugPollChannel && pugVoiceChannels.length === 3) {
-      const curPugMessage = await pugPollChannel.fetchMessage(
-          pugPollChannel.lastMessageID);
+      const messages = await pugPollChannel.fetchMessages({limit: 2});
+      let curPugMessage;
+      if (messages.size === 2) {
+        // The messages may not be sorted.
+        // Set the poll variables appropriately.
+        const first = messages.first();
+        const last = messages.last();
+        if (first.createdTimestamp < last.createdTimestamp) {
+          curPugMessage = first;
+        } else {
+          curPugMessage = last;
+        }
+      } else {
+        curPugMessage = messages.first();
+      }
+
       const curDate = new Date();
       // curDate.getDay() is 0-indexed where 0 = Sunday.
       const days = ['🇺', '🇲', '🇹', '🇼', '🇷', '🇫', '🇸'];
