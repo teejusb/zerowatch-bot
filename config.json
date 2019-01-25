@@ -1,7 +1,16 @@
 {
-  "prefix": "!",
+  "prefix": "!z",
   "guildId": "525005678146879509",
   "guestCode": "yDebKpH",
   "pugPollChannelId": "529910837415116800",
-  "pugAnnounceChannelId": "529910877227319317"
+  "pugAnnounceChannelId": "529910877227319317",
+  "roles": {
+    "admin": "525008681667133440",
+    "mod": "525010134288564264"
+  },
+  "args": {
+    "bnet": {
+      "channelId": "525072573499834378"
+    }
+  }
 }

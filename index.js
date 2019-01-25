@@ -93,7 +93,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       }
 
       // Delete all messages in the PUG announce channel to minimize clutter.
-      const pugAnnounceChannel = client.channels.get(config.pugAnnounceChannelId);
+      const pugAnnounceChannel =
+          client.channels.get(config.pugAnnounceChannelId);
       if (pugAnnounceChannel) {
         pugAnnounceChannel.fetchMessages()
             .then((fetchedMessages) => {
@@ -129,7 +130,8 @@ const hourPoller = cron.job('0 0 * * * *', function() {
       if (reaction.emoji.name === days[curDate.getDay()]) {
         reaction.fetchUsers().then((reactedUsers) => {
           if (reactedUsers.size >= 12) {
-            const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
+            const pugAnnounce =
+                client.channels.get(config.pugAnnounceChannelId);
             pugAnnounce.send(
                 `PUGs are happening today `
               + `(${validDays.get(days[curDate.getDay()])}) in 3 hours!`);
@@ -149,6 +151,23 @@ client.once('ready', () => {
   // https://github.com/AnIdiotsGuide/discordjs-bot-guide/blob/master/coding-guides/tracking-used-invites.md
   // It's probably used to wait while the fetchInvites promise completes.
   wait(1000);
+
+  // Initialize all of the commands.
+  for (commandName in config.args) {
+    if (config.args.hasOwnProperty(commandName)) {
+      console.log(commandName + ' ' + config.args[commandName]);
+      const command = client.commands.get(commandName) ||
+                      client.commands.find(
+                          (cmd) => cmd.aliases &&
+                              cmd.aliases.includes(commandName));
+      if (command.onStart) {
+        command.onStart(client, config);
+      } else {
+        console.log(`Found parameters for command ${commandName} but no ` +
+                    `command exists`);
+      }
+    }
+  }
 
   // Get all the invites from the Zerowatch discord.
   const guild = client.guilds.get(config.guildId);
@@ -209,7 +228,7 @@ client.on('messageReactionAdd', async (messageReaction, user) => {
   // Only post these messages between 5PM PST and 8PM PST to minimize spam.
   // 8PM PST is the usual start time for PUGs.
   const curDate = new Date();
-  if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
+  if (17 <= curDate.getHours() && curDate.getHours() <= 20) {
     const reactedUsers = await messageReaction.fetchUsers();
     if (reactedUsers.size === 12) {
       const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
@@ -243,7 +262,7 @@ client.on('messageReactionRemove', async (messageReaction, user) => {
   // Only post these messages between 5PM PST and 8PM PST to minimize spam.
   // 8PM PST is the usual start time for PUGs.
   const curDate = new Date();
-  if (17 <= curDate.getHours() && curDaye.getHours() <= 20) {
+  if (17 <= curDate.getHours() && curDate.getHours() <= 20) {
     const reactedUsers = await messageReaction.fetchUsers();
     if (reactedUsers.size === 11) {
       const pugAnnounce = client.channels.get(config.pugAnnounceChannelId);
@@ -289,8 +308,12 @@ client.on('message', (message) => {
       message.author.bot) return;
 
   // Regex soup from: https://stackoverflow.com/a/25663729
+  // Capture args within ""s as a single arg, and also strip the ""s.
   const args = message.content.slice(config.prefix.length).trim()
-      .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g);
+      .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g).map((e) => {
+        if (e[0] === '"' && e[e.length - 1] === '"') return e.slice(1, -1);
+        else return e;
+      });
   const commandName = args.shift().toLowerCase();
 
   const command = client.commands.get(commandName) ||
