@@ -136,19 +136,6 @@ const hourPoller = cron.job('0 0 * * * *', async function() {
         console.log(
             'ERROR: Could not find PUG poll channel when creating new poll.');
       }
-
-      // Delete all messages in the PUG announce channel to minimize clutter.
-      const pugAnnounceChannel =
-          client.channels.get(config.pugAnnounceChannelId);
-      if (pugAnnounceChannel) {
-        pugAnnounceChannel.fetchMessages()
-            .then((fetchedMessages) => {
-              pugAnnounceChannel.bulkDelete(fetchedMessages);
-            });
-      } else {
-        console.log(
-            'ERROR: Could not find PUG announce channel.');
-      }
     }
   } else if (curDate.getHours() === 17) {
     // Refetch the PUG poll to get updated values.

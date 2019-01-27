@@ -1,5 +1,3 @@
-const Discord = require('discord.js');
-
 const kCharsPerMessage = 1000;
 const kHeaderString = 'This channel stores a community collection of ' +
 'BattleTags for quick reference.\nUse ' +
@@ -7,25 +5,22 @@ const kHeaderString = 'This channel stores a community collection of ' +
 'a BattleTag from your account.\n';
 
 const kSnowflakeRegex = new RegExp(/<@(\d+)>/);
-const kBattleTagRegex = new RegExp(/.{3,12}#\d{4,5}/);
+const kBattleTagRegex = new RegExp(/.{1,12}#\d{4,5}/);
 const kBattleTagOnlyRegex = new RegExp('^' + kBattleTagRegex.source + '$');
-const kBattletagLineRegex = new RegExp('(.*): (' + kBattleTagRegex.source +
-                                       ', )*('+ kBattleTagRegex.source+ ')');
+const kBattletagLineRegex = new RegExp(
+    kSnowflakeRegex.source + ': (' + kBattleTagRegex.source + ', )*('+
+    kBattleTagRegex.source + ')');
 
 let channelId = null;
 let battleTags = null;
 let modRoles = null;
 
 /**
- * A class to store a set of BattleTags for a particular user or text key. Only
- * one of user and textId will be set. If the class is constructed with a
- * GuildMember the user object will be stored, otherwise the specified text key
- * will be stored.
+ * A class to store a set of BattleTags for a particular user or text key.
  * @class
  *
  * @property {Discord.GuildMember} user The user object this entry is for
- * @property {string} textId The text ID this entry is for
- * @property {string[]} battleTags A list of BattleTags to start with
+ * @property {Set<string>} battleTags The set of BattleTags for this user
  */
 class BattleTagEntry {
   /**
@@ -33,12 +28,10 @@ class BattleTagEntry {
    * @constructor
    *
    * @param {Discord.GuildMember} user The user object to store
-   * @param {string} textId The text ID to store
    * @param {string[]} battleTags A list of BattleTags to start with
    */
-  constructor(user, textId, battleTags) {
+  constructor(user, battleTags) {
     this.user = user;
-    this.textId = textId;
     this.battleTags = new Set(battleTags);
   }
 
@@ -47,17 +40,18 @@ class BattleTagEntry {
    * be added (case-sensitive).
    * @param {string[]} battleTags A list of BattleTags to add
    */
-  append(battleTags) {
-    this.battleTags.concat(battleTags);
+  addAll(battleTags) {
+    for (const battleTag of battleTags) {
+      this.battleTags.add(battleTag);
+    }
   }
 
   /**
    * Removes a list of BattleTags from this BattleTagEntry (case-sensitive).
    * @param {string[]} battleTags A list of BattleTags to remove
    */
-  remove(battleTags) {
-    let battleTag;
-    for (battleTag of battleTags) {
+  removeAll(battleTags) {
+    for (const battleTag of battleTags) {
       if (this.battleTags.has(battleTag)) {
         this.battleTags.delete(battleTag);
       }
@@ -79,21 +73,8 @@ class BattleTagEntry {
    * before b, and 1 if a should be sorted after b.
    */
   static compare(a, b) {
-    const cmpA = a.user ? a.user.displayName : a.textId;
-    const cmpB = b.user ? b.user.displayName : b.textId;
-    if (cmpA === cmpB) return 0;
-    return cmpA < cmpB ? -1 : 1;
-  }
-
-  /**
-   * @return {string} Returns the Snowflake string of the stored user if one
-   * exists, or the text ID otherwise.
-   */
-  toIdString() {
-    if (this.user) {
-      return this.user.toString();
-    }
-    return this.textId;
+    if (a.user.displayName === b.user.displayName) return 0;
+    return a.user.displayName < b.user.displayName ? -1 : 1;
   }
 
   /**
@@ -101,7 +82,7 @@ class BattleTagEntry {
    * string and a list of BattleTags.
    */
   toEntryString() {
-    return this.toIdString() + ': ' +
+    return this.user.toString() + ': ' +
            Array.from(this.battleTags).sort().join(', ');
   }
 }
@@ -115,7 +96,7 @@ class BattleTagEntry {
  */
 function getChannelById(client, channelId) {
   if (!client) {
-    console.error('Error getting channel: No cilent specified');
+    console.error('Error getting channel: No client specified');
     return null;
   }
 
@@ -134,39 +115,17 @@ function getChannelById(client, channelId) {
 
 /**
  * Adds all BattleTags in the BattleTags list to the entry for the specified
- * user or text key. User keys are their Snowflake ID. If an entry was storing
- * a text ID and a user is specified the text ID is overriden and the list of
- * BattleTags is reset.
- * @param {string} key The key of the user to add too
- * @param {(Discord.GuildMember|string)} userOrTextId The GuildMember or text ID
- * to store
+ * user. User keys are their Snowflake ID.
+ * @param {Discord.GuildMember} user The GuildMember to store
  * @param {string[]} battleTagList A list of BattleTags to add
  */
-function addBattleTags(key, userOrTextId, battleTagList) {
-  let discordUser = null;
-  let textId = null;
-  if (userOrTextId instanceof Discord.GuildMember) {
-    discordUser = userOrTextId;
-  } else {
-    textId = userOrTextId;
-  }
-  const debugString = discordUser ? discordUser.toString() : 'null';
-  console.log(`Add BattleTag: ${key}, ${debugString}, ${textId}: ` +
-              `${battleTagList}`);
+function addBattleTags(user, battleTagList) {
+  const key = user.id;
+  console.log(`Add BattleTag: ${key}: ${battleTagList}`);
   if (!battleTags.has(key)) {
-    battleTags.set(key, new BattleTagEntry(discordUser, textId, battleTagList));
+    battleTags.set(key, new BattleTagEntry(user, battleTagList));
   } else {
-    const existingEntry = battleTags.get(key);
-    if (!discordUser && existingEntry.user) {
-      return;
-    } else if (discordUser && !existingEntry.user) {
-      existingEntry.user = discordUser;
-      existingEntry.textId = null;
-      existingEntry.battleTags = new Set();
-    }
-    for (battleTag of battleTagList) {
-      existingEntry.battleTags.add(battleTag);
-    }
+    battleTags.get(key).addAll(battleTagList);
   }
 };
 
@@ -182,7 +141,7 @@ function removeBattleTags(channel, key, battleTagList) {
   if (!battleTags.has(key)) {
     channel.send(`Could not find key ${key}`);
   }
-  battleTags.get(key).remove(battleTagList);
+  battleTags.get(key).removeAll(battleTagList);
   if (battleTags.get(key).numBattleTags == 0) {
     battleTags.delete(key);
   }
@@ -209,23 +168,18 @@ function reloadBattleTags(client, guild, channelId) {
         if (!line.match(kBattletagLineRegex)) continue;
         const userEntry = line.split(/:\s+/);
         const userSnowflake = parseSnowflake(userEntry[0]);
-        const battleTagList = userEntry[1].split(/, /);
         if (userSnowflake) {
           guild.fetchMember(userSnowflake).then((user) => {
-            if (user) {
-              addBattleTags(userSnowflake, user, battleTagList);
-            } else {
-              addBattleTags(userEntry[0], userEntry[0], battleTagList);
-            }
-            printBattleTags(message.client, channelId);
+            addBattleTags(user, userEntry[1].split(/, /));
+          }).catch((error) => {
+            console.error(error);
+            message.channel.send(
+                `No user with snowflake ${userSnowflake} found`);
           });
-        } else {
-          addBattleTags(userEntry[0], userEntry[0], battleTagList);
-          printBattleTags(message.client, channelId);
         }
       }
     }
-  });
+  }).catch(console.error);
 };
 
 /**
@@ -282,7 +236,7 @@ function printBattleTags(client, channelId) {
         message.delete();
       }
     }
-  });
+  }).catch(console.error);
 };
 
 /**
@@ -297,20 +251,9 @@ function parseSnowflake(text) {
 }
 
 /**
- * Parses a possible mention string into a Snowflake string.
- * @param {string} text The text to parse
- * @return {string} The extracted Snowflake, or the input if the text is not a
- * mention.
- */
-function tryParseSnowflake(text) {
-  const userSnowflake = text.match(kSnowflakeRegex);
-  return userSnowflake ? userSnowflake[1] : text;
-};
-
-/**
  * Checks the permissions of a user against the required roles.
  * TODO(aalberg): Refactor this to a utility module.
- * @param {Discord.User} user The user to check
+ * @param {Discord.GuildMember} user The user to check
  * @param {string[]} requiredRoles The Snowflakes of the roles to check for
  * @return {bool} true if the specified GuildMemeber has one of the required
  * roles, and false otherwise.
@@ -390,7 +333,7 @@ module.exports = {
         break;
       case 'add':
         if (checkArgs(message.channel, args, 2)) {
-          addBattleTags(message.member.id, message.member, [args[0]]);
+          addBattleTags(message.member, [args[0]]);
           printBattleTags(message.client, channelId);
         }
         message.delete();
@@ -408,16 +351,15 @@ module.exports = {
             const snowflake = parseSnowflake(args[0]);
             if (snowflake) {
               message.guild.fetchMember(snowflake).then((user) => {
-                if (user) {
-                  addBattleTags(snowflake, user, [args[1]]);
-                } else {
-                  addBattleTags(snowflake, snowflake, [args[1]]);
-                }
+                addBattleTags(user, [args[1]]);
                 printBattleTags(message.client, channelId);
+              }).catch((error) => {
+                console.error(error);
+                message.channel.send(
+                    `No user with snowflake ${args[0]} found`);
               });
             } else {
-              addBattleTags(args[0], args[0], [args[1]]);
-              printBattleTags(message.client, channelId);
+              message.channel.send(`${args[0]} is not a snowflake`);
             }
           }
         } else {
@@ -427,9 +369,13 @@ module.exports = {
       case 'adminremove':
         if (checkPermissions(message.member, modRoles)) {
           if (checkArgs(message.channel, args, 3)) {
-            removeBattleTags(message.channel, tryParseSnowflake(args[0]),
-                [args[1]]);
-            printBattleTags(message.client, channelId);
+            const snowflake = parseSnowflake(args[0]);
+            if (snowflake) {
+              removeBattleTags(message.channel, snowflake, [args[1]]);
+              printBattleTags(message.client, channelId);
+            } else {
+              message.channel.send(`${args[0]} is not a snowflake`);
+            }
           }
         } else {
           message.channel.send('Permission denied');
