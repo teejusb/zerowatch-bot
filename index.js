@@ -74,8 +74,8 @@ const hourPoller = cron.job('0 0 * * * *', async function() {
                 console.log('Cleared PUG announce channel.');
               });
         } else {
-          console.log(
-              'ERROR: Could not find PUG announce channel to delete messages from.');
+          console.log('ERROR: Could not find PUG announce channel to delete ' +
+                      'messages from.');
         }
       } else {
         console.log(
@@ -184,6 +184,23 @@ client.once('ready', () => {
   // https://github.com/AnIdiotsGuide/discordjs-bot-guide/blob/master/coding-guides/tracking-used-invites.md
   // It's probably used to wait while the fetchInvites promise completes.
   wait(1000);
+
+  // Initialize all of the commands.
+  for (commandName in config.args) {
+    if (config.args.hasOwnProperty(commandName)) {
+      console.log(commandName + ' ' + config.args[commandName]);
+      const command = client.commands.get(commandName) ||
+                      client.commands.find(
+                          (cmd) => cmd.aliases &&
+                              cmd.aliases.includes(commandName));
+      if (command.onStart) {
+        command.onStart(client, config);
+      } else {
+        console.log(`Found parameters for command ${commandName} but no ` +
+                    `command exists`);
+      }
+    }
+  }
 
   // Get all the invites from the Zerowatch discord.
   const guild = client.guilds.get(config.guildId);
@@ -362,8 +379,12 @@ client.on('message', (message) => {
       message.author.bot) return;
 
   // Regex soup from: https://stackoverflow.com/a/25663729
+  // Capture args within ""s as a single arg, and also strip the ""s.
   const args = message.content.slice(config.prefix.length).trim()
-      .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g);
+      .split(/ +(?=(?:(?:[^"]*"){2})*[^"]*$)/g).map((e) => {
+        if (e[0] === '"' && e[e.length - 1] === '"') return e.slice(1, -1);
+        else return e;
+      });
   const commandName = args.shift().toLowerCase();
 
   const command = client.commands.get(commandName) ||
