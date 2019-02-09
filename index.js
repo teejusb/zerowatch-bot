@@ -288,7 +288,7 @@ const messageReactionResponse = async (
   const reactedUsers = await messageReaction.fetchUsers();
   // When we hit 6 people responding to any specific day on the poll, remove
   // the bot vote.
-  if (mode === 'add' && reactedUsers.size === 6) {
+  if (mode === 'add' && reactedUsers.size >= 6) {
     for (const user of reactedUsers.values()) {
       if (user.bot) {
         messageReaction.remove(user);
@@ -351,7 +351,7 @@ client.on('guildMemberAdd', (member) => {
     const invite = guildInvites.get(config.guestCode);
     if (invite) {
       if (invite.uses == guestUses) {
-        const role = member.guild.roles.find((r) => r.name === 'TempRole');
+        const role = member.guild.roles.find((r) => r.name === 'Member');
         member.addRole(role, 'Auto-added via bot.');
       } else {
         guestUses = invite.uses;
