@@ -1,7 +1,7 @@
 const kCharsPerMessage = 1000;
-const kHeaderString = 'This channel stores a community collection of ' +
+let kHeaderString = 'This channel stores a community collection of ' +
 'BattleTags for quick reference.\nUse ' +
-'\'[prefix] bnet [add|remove] [battleTag]\' in any channel to add or remove ' +
+'\'{prefix}bnet [add|remove] [battleTag]\' in any channel to add or remove ' +
 'a BattleTag from your account.\n';
 
 const kSnowflakeRegex = new RegExp(/<@(\d+)>/);
@@ -49,13 +49,19 @@ class BattleTagEntry {
   /**
    * Removes a list of BattleTags from this BattleTagEntry (case-sensitive).
    * @param {string[]} battleTags A list of BattleTags to remove
+   * @return {bool} true if all BattleTags were present in the list of
+   * BattleTags for the provided key, and false otherwise.
    */
   removeAll(battleTags) {
+    let ret = true;
     for (const battleTag of battleTags) {
       if (this.battleTags.has(battleTag)) {
         this.battleTags.delete(battleTag);
+      } else {
+        ret = false;
       }
     }
+    return ret;
   }
 
   /**
@@ -141,7 +147,9 @@ function removeBattleTags(channel, key, battleTagList) {
   if (!battleTags.has(key)) {
     channel.send(`Could not find key ${key}`);
   }
-  battleTags.get(key).removeAll(battleTagList);
+  if (!battleTags.get(key).removeAll(battleTagList)) {
+    channel.send(`Some BattleTags in remove list did not exist`);
+  }
   if (battleTags.get(key).numBattleTags == 0) {
     battleTags.delete(key);
   }
@@ -156,30 +164,37 @@ function removeBattleTags(channel, key, battleTagList) {
  * @param {string} channelId The Snowflake ID of the channel to retrive messages
  * from
  */
-function reloadBattleTags(client, guild, channelId) {
+async function reloadBattleTags(client, guild, channelId) {
   const channel = getChannelById(client, channelId);
   if (!channel) return;
-  channel.fetchMessages().then((messages) => {
-    battleTags = new Map();
-    for (message of messages.values()) {
-      for (line of message.content.split('\n')) {
-        // TODO(aalberg) Improve the regex group capturing so we can skip some
-        // of the string splitting.
-        if (!line.match(kBattletagLineRegex)) continue;
-        const userEntry = line.split(/:\s+/);
-        const userSnowflake = parseSnowflake(userEntry[0]);
-        if (userSnowflake) {
-          guild.fetchMember(userSnowflake).then((user) => {
-            addBattleTags(user, userEntry[1].split(/, /));
-          }).catch((error) => {
-            console.error(error);
-            message.channel.send(
-                `No user with snowflake ${userSnowflake} found`);
-          });
+  let messages;
+  try {
+    messages = await channel.fetchMessages();
+  } catch (e) {
+    console.error(e.message);
+  }
+  battleTags = new Map();
+  for (message of messages.values()) {
+    for (line of message.content.split('\n')) {
+      // TODO(aalberg) Improve the regex group capturing so we can skip some
+      // of the string splitting.
+      if (!line.match(kBattletagLineRegex)) continue;
+      const userEntry = line.split(/:\s+/);
+      const userSnowflake = parseSnowflake(userEntry[0]);
+      if (userSnowflake) {
+        let user;
+        try {
+          user = await guild.fetchMember(userSnowflake);
+        } catch (e) {
+          console.error(e.message);
+          message.channel.send(
+              `No user with snowflake ${userSnowflake} found`);
         }
+        addBattleTags(user, userEntry[1].split(/, /));
       }
     }
-  }).catch(console.error);
+  }
+  printBattleTags(client, channelId);
 };
 
 /**
@@ -296,6 +311,7 @@ module.exports = {
   description: 'Battletag management',
   onStart(client, config) {
     console.log(`Starting ${this.name}`);
+    kHeaderString = kHeaderString.replace('{prefix}', config.prefix);
     channelId = config.args[this.name]['channelId'];
     modRoles = [];
     ['admin', 'mod'].forEach((r) => {
