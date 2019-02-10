@@ -172,6 +172,7 @@ async function reloadBattleTags(client, guild, channelId) {
     messages = await channel.fetchMessages();
   } catch (e) {
     console.error(e.message);
+    return;
   }
   battleTags = new Map();
   for (message of messages.values()) {
