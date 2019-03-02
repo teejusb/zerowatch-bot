@@ -179,10 +179,7 @@ async function reloadBattleTags(client, guild, channelId) {
     for (line of message.content.split('\n')) {
       // TODO(aalberg) Improve the regex group capturing so we can skip some
       // of the string splitting.
-      if (!line.match(kBattletagLineRegex)) {
-        console.log("skipping line: " + line);
-        continue;
-      }
+      if (!line.match(kBattletagLineRegex)) continue;
       const userEntry = line.split(/:\s+/);
       const userSnowflake = parseSnowflake(userEntry[0]);
       if (userSnowflake) {
