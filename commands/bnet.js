@@ -4,7 +4,7 @@ let kHeaderString = 'This channel stores a community collection of ' +
 '\'{prefix}bnet [add|remove] [battleTag]\' in any channel to add or remove ' +
 'a BattleTag from your account.\n';
 
-const kSnowflakeRegex = new RegExp(/<@(\d+)>/);
+const kSnowflakeRegex = new RegExp(/<@!?(\d+)>/);
 const kBattleTagRegex = new RegExp(/.{1,12}#\d{4,5}/);
 const kBattleTagOnlyRegex = new RegExp('^' + kBattleTagRegex.source + '$');
 const kBattletagLineRegex = new RegExp(
@@ -179,7 +179,10 @@ async function reloadBattleTags(client, guild, channelId) {
     for (line of message.content.split('\n')) {
       // TODO(aalberg) Improve the regex group capturing so we can skip some
       // of the string splitting.
-      if (!line.match(kBattletagLineRegex)) continue;
+      if (!line.match(kBattletagLineRegex)) {
+        console.log("skipping line: " + line);
+        continue;
+      }
       const userEntry = line.split(/:\s+/);
       const userSnowflake = parseSnowflake(userEntry[0]);
       if (userSnowflake) {
