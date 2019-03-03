@@ -13,15 +13,6 @@ validDays.set('🇺', 'Sunday');
 // Store a reference to the client.
 let discordClient = null;
 
-// Export these variables so other modules can use them (like the remind
-// command).
-// The PUG poll channel and announce channel.
-module.exports.pugPollChannelId = null;
-module.exports.pugAnnounceChannelId = null;
-// The current and previous PUG poll information.
-module.exports.prevPugMessage = null;
-module.exports.curPugMessage = null;
-
 // Cron job to manage periodic things.
 const hourPoller = cron.job('0 0 * * * *', doPeriodicTasks);
 
@@ -319,6 +310,13 @@ function getMonday(date) {
 
 module.exports = {
   name: 'pug_poll',
+  // The PUG poll channel and announce channel.
+  pugPollChannelId: null,
+  pugAnnounceChannelId: null,
+  // The current and previous PUG poll information.
+  prevPugMessage: null,
+  curPugMessage: null,
+
   onMessageReactionAdd,
   onMessageReactionRemove,
   onStart(client, config) {
