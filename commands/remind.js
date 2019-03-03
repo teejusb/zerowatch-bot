@@ -10,6 +10,8 @@ module.exports = {
     const pugVoiceChannels = [];
 
     message.client.channels.forEach((channel) => {
+      // TODO(aalberg): WHY ARE THESE NAMES HARDCODED??? This should ask the
+      // poll module what channels/messages it cares about.
       if (channel.name === 'pug-poll') {
         pugPollChannel = channel;
       } else if (channel.name === 'PUG Lobby' ||
