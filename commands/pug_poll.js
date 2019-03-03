@@ -320,7 +320,6 @@ module.exports = {
   onMessageReactionAdd,
   onMessageReactionRemove,
   onStart(client, config) {
-    console.log('pug_poll starting');
     discordClient = client;
     module.exports.pugPollChannelId = config.pugPollChannelId;
     module.exports.pugAnnounceChannelId = config.pugAnnounceChannelId;
