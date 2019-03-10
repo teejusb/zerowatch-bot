@@ -4,7 +4,7 @@ let kHeaderString = 'This channel stores a community collection of ' +
 '\'{prefix}bnet [add|remove] [battleTag]\' in any channel to add or remove ' +
 'a BattleTag from your account.\n';
 
-const kSnowflakeRegex = new RegExp(/<@(\d+)>/);
+const kSnowflakeRegex = new RegExp(/<@!?(\d+)>/);
 const kBattleTagRegex = new RegExp(/.{1,12}#\d{4,5}/);
 const kBattleTagOnlyRegex = new RegExp('^' + kBattleTagRegex.source + '$');
 const kBattletagLineRegex = new RegExp(
@@ -79,8 +79,8 @@ class BattleTagEntry {
    * before b, and 1 if a should be sorted after b.
    */
   static compare(a, b) {
-    if (a.user.displayName === b.user.displayName) return 0;
-    return a.user.displayName < b.user.displayName ? -1 : 1;
+    return a.user.displayName.localeCompare(b.user.displayName, 'en',
+        {sensitivity: 'base'});
   }
 
   /**
