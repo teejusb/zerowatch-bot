@@ -79,8 +79,8 @@ class BattleTagEntry {
    * before b, and 1 if a should be sorted after b.
    */
   static compare(a, b) {
-    if (a.user.displayName === b.user.displayName) return 0;
-    return a.user.displayName < b.user.displayName ? -1 : 1;
+    return a.user.displayName.localeCompare(b.user.displayName, 'en',
+        {sensitivity: 'base'});
   }
 
   /**
