@@ -110,7 +110,9 @@ const hourPoller = cron.job('0 0 * * * *', async function() {
       pugPollText +=
           'Please vote with your availibility with the following reactions ' +
           '(generally 8PM PST). Feel free to add/remove votes over the ' +
-          'week but please refrain from removing votes the day of:\n' +
+          'week. Please try to keep your availability status up to date, ' +
+          'people will frequently try to find extra players if the poll is ' +
+          '>=10 votes:\n' +
           '\n'+
           '🇲 - Monday\n' +
           '🇹 - Tuesday\n' +
