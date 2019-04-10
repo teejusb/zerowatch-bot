@@ -107,7 +107,9 @@ async function postPoll(weekday) {
   pugPollText +=
       'Please vote with your availibility with the following reactions ' +
       '(generally 8PM PST). Feel free to add/remove votes over the ' +
-      'week but please refrain from removing votes the day of:\n' +
+      'week. Please try to keep your availability status up to date, ' +
+      'people will frequently try to find extra players if the poll is ' +
+      '>=10 votes:\n' +
       '\n'+
       '🇲 - Monday\n' +
       '🇹 - Tuesday\n' +
@@ -263,8 +265,6 @@ async function messageReactionResponse(messageReaction, user, pugMessage,
         messageReaction.remove(user);
       }
     }
-    // We can return early here since we won't be close to the threshold yet.
-    return;
   }
 
   const curDate = new Date();
@@ -273,13 +273,18 @@ async function messageReactionResponse(messageReaction, user, pugMessage,
   // Only post these messages between 5PM PST and 8PM PST on the day of
   // the PUGs to minimize spam. 8PM PST is the usual start time for PUGs.
   if (days[curDate.getDay()] === emojiName &&
-      17 <= curDate.getHours() && curDate.getHours() <= 20) {
+      17 <= curDate.getHours() && curDate.getHours() <= 19) {
     const pugAnnounce =
         discordClient.channels.get(module.exports.pugAnnounceChannelId);
 
     // If we hit 12, then that means we incremented from 11.
+    // TODO(teejusb): Add functionality to modify PUGs time.
     if (mode === 'add' && reactedUsers.size === 12) {
-      pugAnnounce.send(`PUGs are on for ${validDays.get(emojiName)}!`);
+      pugAnnounce.send(
+          `PUGs are happening today `
+        + `(${validDays.get(emojiName)}) at 8PM PST! `
+        + `Please mark your availability over at `
+        + `https:\/\/zerowatch-pugs.firebaseapp.com/`);
     // If we dropped below the threshold then notify users that we've lost
     // quorum for that day.
     // If we hit 11, then that means we decremented from 12.
