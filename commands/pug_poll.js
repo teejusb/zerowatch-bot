@@ -27,29 +27,40 @@ async function doPeriodicTasks() {
     console.log('No client');
     return;
   }
-  if (!util.exists(module.exports.pugPollChannelId)) return;
-  if (!util.exists(module.exports.pugAnnounceChannelId)) return;
-  if (!util.exists(module.exports.prevPugMessage)) return;
+  if (!util.exists(module.exports.pugPollChannelId)) {
+    console.log('Pug Poll Channel ID not found');
+    return;
+  }
+  if (!util.exists(module.exports.pugAnnounceChannelId)) {
+    console.log('Pug Announce Channel ID not found');
+    return;
+  }
 
   const curDate = new Date();
-  if (curDate.getDay() === 1 && curDate.getHours() === 0) {
-    // Delete the previous poll on Monday at Midnight.
-    deletePoll();
-  } else if (curDate.getDay() === 0 && curDate.getHours() === 12) {
-    // If it's Sunday at 12 PM PST, post a new PUG poll. The poll starts from
-    // the next day because we post a day early.
-    const tomorrow = new Date();
-    tomorrow.setDate(curDate.getDate() + 1);
-    postPoll(tomorrow);
+
+  if (curDate.getHours() === 0) {
+    if (curDate.getDay() === 1) {
+      // Delete the previous poll on Monday at Midnight.
+      deletePreviousPoll();
+    }
+  } else if (curDate.getHours() === 12) {
+    if (curDate.getDay() === 0) {
+      // If it's Sunday at 12 PM PST, post a new PUG poll. The poll starts from
+      // the next day because we post a day early.
+      const tomorrow = new Date();
+      tomorrow.setDate(curDate.getDate() + 1);
+      postPoll(tomorrow);
+    }
   } else if (curDate.getHours() === 17) {
     announcePug();
   }
 };
 
 /**
- * Delete the current PUG poll.
+ * Delete the previous PUG poll.
  */
-function deletePoll() {
+function deletePreviousPoll() {
+  console.log('Attempting to delete previous PUG poll...');
   const pugPollChannel =
       discordClient.channels.get(module.exports.pugPollChannelId);
   if (pugPollChannel && util.exists(module.exports.prevPugMessage)) {
@@ -85,6 +96,7 @@ function deletePoll() {
  * Polls will always start from Monday.
  */
 async function postPoll(weekday) {
+  console.log('Attempting to post a new PUG poll...');
   const monday = getMonday(weekday);
   const oneWeekFromMonday = new Date(monday);
   oneWeekFromMonday.setDate(monday.getDate() + 6);
@@ -143,6 +155,7 @@ async function postPoll(weekday) {
  * @param {number} day The current day of the week.
  */
 async function announcePug(day) {
+  console.log('Checking current PUG poll...');
   // If it is 5pm and we have enough votes, send the announce message.
   // Refetch the PUG poll to get updated values.
   const pugPollChannel =
@@ -155,6 +168,8 @@ async function announcePug(day) {
     } else if (util.exists(module.exports.curPugMessage)) {
       pugMessage =
           await pugPollChannel.fetchMessage(module.exports.curPugMessage.id);
+    } else {
+      console.log('ERROR: Couldn\'t fetch current poll info.');
     }
   } else {
     console.log('ERROR: Couldn\'t find PUG poll channel.');
@@ -167,6 +182,7 @@ async function announcePug(day) {
     for (const reaction of pugMessage.reactions.values()) {
       if (reaction.emoji.name === days[day]) {
         const reactedUsers = await reaction.fetchUsers();
+        console.log(`${reactedUsers.size} people have responded for today.`);
         if (reactedUsers.size >= 12) {
           const pugAnnounce = discordClient.channels
               .get(module.exports.pugAnnounceChannelId);
@@ -175,6 +191,18 @@ async function announcePug(day) {
             + `(${validDays.get(days[day])}) in 3 hours! `
             + `Please mark your availability over at `
             + `https:\/\/zerowatch-pugs.firebaseapp.com/`);
+
+          // @Mention the people who've responded to the poll.
+          let messageText = '';
+          for (const user of reactedUsers.values()) {
+            if (messageText.length > 0) messageText += ', ';
+            messageText += user.toString();
+          }
+          pugAnnounce.send(messageText);
+
+          console.log('Announced PUGs for today.');
+        } else {
+          console.log('Not enough people for PUGs today.');
         }
       }
     }
@@ -363,6 +391,7 @@ module.exports = {
       console.log('No PUG poll channel');
     }
 
+    console.log('Attempting to start hour poller');
     hourPoller.start();
   },
   onMessage(message) {
@@ -380,7 +409,7 @@ module.exports = {
   execute(message, args) {
     // TODO(aalberg) Refactor the permissions module from bnet to util so we
     // can reenable this with actual user validation.
-    return;
+    // return;
     if (args.length > 1) {
       console.log('Too many args');
     } else if (args[0] === 'post') {

@@ -3,7 +3,7 @@ const Discord = require('discord.js');
 
 module.exports = {
   name: 'remind',
-  cooldown: 15 * 60, // 15 minutes
+  cooldown: 8 * 60, // 8 minutes
   description: 'Remind the missing players for today\'s PUGs',
   async execute(message, args) {
     let pugPollChannel;
@@ -58,7 +58,7 @@ module.exports = {
       }
 
       if (toRemindUsers.size > 0) {
-        messageText = '';
+        let messageText = '';
         for (const user of toRemindUsers.values()) {
           if (messageText.length > 0) messageText += ', ';
           messageText += user.toString();
