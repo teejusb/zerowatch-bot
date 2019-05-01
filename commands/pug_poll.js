@@ -52,7 +52,7 @@ async function doPeriodicTasks() {
       postPoll(tomorrow);
     }
   } else if (curDate.getHours() === 17) {
-    announcePug();
+    announcePug(curDate.getDay());
   }
 };
 
