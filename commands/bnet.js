@@ -1,11 +1,11 @@
 const kCharsPerMessage = 1000;
 let kHeaderString = 'This channel stores a community collection of ' +
 'BattleTags for quick reference.\nUse ' +
-'\'{prefix}bnet add|remove battleTag@numbers\' in any channel to add or ' +
+'\'{prefix}bnet add|remove battleTag#numbers\' in any channel to add or ' +
 'remove a BattleTag from your account.\n';
 
 const kSnowflakeRegex = new RegExp(/<@!?(\d+)>/);
-const kBattleTagRegex = new RegExp(/.{1,12}#\d{4,5}/);
+const kBattleTagRegex = new RegExp(/.{1,12}#\d{4,6}/);
 const kBattleTagOnlyRegex = new RegExp('^' + kBattleTagRegex.source + '$');
 const kBattletagLineRegex = new RegExp(
     kSnowflakeRegex.source + ': (' + kBattleTagRegex.source + ', )*('+
