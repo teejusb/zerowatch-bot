@@ -98,6 +98,14 @@ client.on('guildMemberAdd', (member) => {
       if (invite.uses == guestUses) {
         const role = member.guild.roles.find((r) => r.name === 'Member');
         member.addRole(role, 'Auto-added via bot.');
+        const welcomeChannel =
+            client.channels.get(config.welcomeChannelId);
+        if (welcomeChannel) {
+          welcomeChannel.send(`Welcome ${member.toString()}!`)
+              .catch(console.error);
+        } else {
+          console.log(`Could not find channel ${config.welcomeChannelId}`);
+        }
       } else {
         guestUses = invite.uses;
       }
