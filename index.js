@@ -111,6 +111,13 @@ client.on('guildMemberAdd', (member) => {
       }
     }
   });
+  
+  for (const entry of client.commands) {
+    const command = entry[1];
+    if (util.exists(command.onGuildMemberAdd)) {
+      command.onGuildMemberAdd(member);
+    }
+  }
 });
 
 // ================ On message ================
