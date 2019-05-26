@@ -1,14 +1,14 @@
-const kCharsPerMessage = 1000;
+const util = require('../util/util.js');
+
 let kHeaderString = 'This channel stores a community collection of ' +
 'BattleTags for quick reference.\nUse ' +
 '\'{prefix}bnet add|remove battleTag#numbers\' in any channel to add or ' +
 'remove a BattleTag from your account.\n';
 
-const kSnowflakeRegex = new RegExp(/<@!?(\d+)>/);
 const kBattleTagRegex = new RegExp(/.{1,12}#\d{4,6}/);
 const kBattleTagOnlyRegex = new RegExp('^' + kBattleTagRegex.source + '$');
 const kBattletagLineRegex = new RegExp(
-    kSnowflakeRegex.source + ': (' + kBattleTagRegex.source + ', )*('+
+    util.kSnowflakeRegex.source + ': (' + kBattleTagRegex.source + ', )*('+
     kBattleTagRegex.source + ')');
 
 let channelId = null;
@@ -24,7 +24,7 @@ let modRoles = null;
  */
 class BattleTagEntry {
   /**
-   * Constructor for BattleTagEntry. Only one of user and text should be set.
+   * Constructor for BattleTagEntry.
    * @constructor
    *
    * @param {Discord.GuildMember} user The user object to store
@@ -72,7 +72,7 @@ class BattleTagEntry {
   }
 
   /**
-   * Compares two BattleTagEntry's and for sorting.
+   * Compares two BattleTagEntry's for sorting.
    * @param {BattleTagEntry} a
    * @param {BattleTagEntry} b
    * @return {number} 0 if a and b are sorted equally, -1 if a should be sorted
@@ -92,32 +92,6 @@ class BattleTagEntry {
            Array.from(this.battleTags).sort().join(', ');
   }
 }
-
-/**
- * Retrieves the specified channel using the specified client.
- * @param {Discord.Client} client The client to use for querying
- * @param {string} channelId The snowflake for the channel to retrieve
- * @return {Discord.Channel} The channel retrieve, or null if it does not
- * exist.
- */
-function getChannelById(client, channelId) {
-  if (!client) {
-    console.error('Error getting channel: No client specified');
-    return null;
-  }
-
-  if (!channelId) {
-    console.error('Error getting channel: No channel ID specified');
-    return null;
-  }
-
-  const channel = client.channels.get(channelId);
-  if (!channel) {
-    console.error(`Error getting channel: Could not find channel with ` +
-                  `ID ${channelId}`);
-  }
-  return channel;
-};
 
 /**
  * Adds all BattleTags in the BattleTags list to the entry for the specified
@@ -165,105 +139,62 @@ function removeBattleTags(channel, key, battleTagList) {
  * from
  */
 async function reloadBattleTags(client, guild, channelId) {
-  const channel = getChannelById(client, channelId);
-  if (!channel) return;
-  let messages;
-  try {
-    messages = await channel.fetchMessages();
-  } catch (e) {
-    console.error(e.message);
-    return;
-  }
   battleTags = new Map();
-  for (message of messages.values()) {
-    for (line of message.content.split('\n')) {
-      // TODO(aalberg) Improve the regex group capturing so we can skip some
-      // of the string splitting.
-      if (!line.match(kBattletagLineRegex)) continue;
-      const userEntry = line.split(/:\s+/);
-      const userSnowflake = parseSnowflake(userEntry[0]);
-      if (userSnowflake) {
-        let user;
-        try {
-          user = await guild.fetchMember(userSnowflake);
-        } catch (e) {
-          console.error(e.message);
-          message.channel.send(
-              `No user with snowflake ${userSnowflake} found`);
-        }
-        addBattleTags(user, userEntry[1].split(/, /));
-      }
+  callback = reloadBattleTagsCallback.bind(null, guild);
+  await util.iterateChannelLines(client, channelId, callback);
+  printBattleTags(client, channelId);
+}
+
+/**
+ * A callback to process a single line containing a BattleTag. Attempts to
+ * parse BattleTags from the line and add them to the existing map of
+ * BattleTagEntry's. Members are fectched from the provided guild to use as map
+ * keys.
+ * @param {Discord.Guild} guild The Guild to fetch members from.
+ * @param {string} line The line to process.
+ */
+async function reloadBattleTagsCallback(guild, line) {
+  // TODO(aalberg) Improve the regex group capturing so we can skip some
+  // of the string splitting.
+  if (!line.match(kBattletagLineRegex)) return;
+  const userEntry = line.split(/:\s+/);
+  const userSnowflake = util.parseSnowflake(userEntry[0]);
+  if (userSnowflake) {
+    try {
+      const user = await guild.fetchMember(userSnowflake);
+      addBattleTags(user, userEntry[1].split(/, /));
+    } catch (e) {
+      console.error(e.message);
+      message.channel.send(
+          `No user with snowflake ${userSnowflake} found`);
     }
   }
-  printBattleTags(client, channelId);
-};
+}
 
 /**
  * Prints all of the currently stored BattleTags in the appropriate channel.
- * Prefers editing exiting message to adding new ones, and removes messages by
- * other users in the channel.
  * @param {Discord.Client} client The Client to use to print
  * @param {string} channelId The Snowflake ID of the channel to print to
  */
 function printBattleTags(client, channelId) {
   if (!battleTags) return;
-
-  // Build a list of messages to write.
-  const textMessages = [kHeaderString];
-  for (entry of [...battleTags.entries()].map((e) => e[1])
-      .sort(BattleTagEntry.compare)) {
-    const line = entry.toEntryString();
-    if (textMessages[textMessages.length - 1].length +
-        line.length + 1 > kCharsPerMessage) {
-      textMessages.push(line);
-    } else {
-      textMessages[textMessages.length - 1] += '\n' + line;
-    }
-  }
-
-  // Get the current channel messages.
-  const channel = getChannelById(client, channelId);
-  if (!channel) return;
-  channel.fetchMessages().then((messages) => {
-    // Filter to self messages.
-    const sortedMessages = [...messages.entries()].sort().map((e) => e[1]);
-    const selfMessages = sortedMessages.filter(
-        (m) => m.author.id === client.user.id);
-
-    // Update the contents of the existing messages.
-    for (i = 0; i < Math.min(selfMessages.length, textMessages.length); i++) {
-      selfMessages[i].edit(textMessages[i]);
-    }
-
-    // Add messages as necessary.
-    for (i = selfMessages.length; i < textMessages.length; i++) {
-      channel.send(textMessages[i]);
-    }
-
-    // Delete extra self messages if necessary.
-    for (i = textMessages.length; i < selfMessages.length; i++) {
-      selfMessages[i].delete();
-    }
-
-    // Delete all other messages in the channel.
-    for (message of sortedMessages.filter((m) =>
-      m.author.id !== client.user.id)) {
-      if (message.author.id !== client.user.id) {
-        message.delete();
-      }
-    }
-  }).catch(console.error);
+  util.printLinesToChannel(client, channelId,
+      battleTagLineGenerator(battleTags));
 };
 
 /**
- * Parses a possible mention string into a Snowflake string.
- * @param {string} text The text to parse
- * @return {string} The extracted Snowflake, or null if the text is not a
- * mention.
+ * Generates a line for the BattleTag message header and each BattleTag in the
+ * battleTags object.
+ * @param {Map<BattleTagEntry>} battleTags The map to return lines from
+ * @yields {string} A single line, either the message header or a line
+ * represending a BattleTag entry.
  */
-function parseSnowflake(text) {
-  const userSnowflake = text.match(kSnowflakeRegex);
-  return userSnowflake ? userSnowflake[1] : null;
+function* battleTagLineGenerator(battleTags) {
+  yield kHeaderString;
+  for (entry of [...battleTags.entries()].map((e) => e[1])
+      .sort(BattleTagEntry.compare)) {
+    yield entry.toEntryString();
+  }
 }
 
 /**

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const Discord = require('discord.js');
+const util = require('./util/util.js');
 
 // TODO(aalberg): Use JSON.parse and maybe some more complex handling here.
 const {token} = require('./config_private.json');
@@ -38,7 +39,7 @@ client.once('ready', () => {
   // Initialize all of the commands.
   for (const entry of client.commands) {
     const command = entry[1];
-    if (command.onStart) {
+    if (util.exists(command.onStart)) {
       command.onStart(client, config);
     }
   }
@@ -69,7 +70,7 @@ client.once('ready', () => {
 client.on('messageReactionAdd', async (messageReaction, user) => {
   for (const entry of client.commands) {
     const command = entry[1];
-    if (command.onMessageReactionAdd) {
+    if (util.exists(command.onMessageReactionAdd)) {
       command.onMessageReactionAdd(messageReaction, user);
     }
   }
@@ -81,7 +82,7 @@ client.on('messageReactionAdd', async (messageReaction, user) => {
 client.on('messageReactionRemove', async (messageReaction, user) => {
   for (const entry of client.commands) {
     const command = entry[1];
-    if (command.onMessageReactionRemove) {
+    if (util.exists(command.onMessageReactionRemove)) {
       command.onMessageReactionRemove(messageReaction, user);
     }
   }
@@ -127,7 +128,7 @@ client.on('message', (message) => {
   // Forward the message to all commands for generic operations.
   for (const entry of client.commands) {
     const command = entry[1];
-    if (command.onMessage) {
+    if (util.exists(command.onMessage)) {
       command.onMessage(message);
     }
   }
@@ -196,11 +197,13 @@ client.on('message', (message) => {
   setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
 
   // Execute the command.
-  try {
-    command.execute(message, args);
-  } catch (error) {
-    console.error(error);
-    message.reply('there was an error trying to execute that command!');
+  if (util.exists(command.execute)) {
+    try {
+      command.execute(message, args);
+    } catch (error) {
+      console.error(error);
+      message.reply('there was an error trying to execute that command!');
+    }
   }
 });
 
