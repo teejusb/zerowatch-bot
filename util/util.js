@@ -76,9 +76,10 @@ async function iterateChannelLines(client, channelId, callback) {
 function printLinesToChannel(client, channelId, gen) {
   const textMessages = [];
   for (line of gen) {
-    const line = genOutput.value;
-    if (textMessages[textMessages.length - 1].length +
-        line.length + 1 > kCharsPerMessage) {
+    //const line = genOutput.value;
+    if (textMessages.length == 0 ||
+        textMessages[textMessages.length - 1].length + line.length + 1 >
+        kCharsPerMessage) {
       textMessages.push(line);
     } else {
       textMessages[textMessages.length - 1] += '\n' + line;

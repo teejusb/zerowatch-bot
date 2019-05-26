@@ -158,7 +158,7 @@ async function reloadBattleTagsCallback(guild, line) {
   // of the string splitting.
   if (!line.match(kBattletagLineRegex)) return;
   const userEntry = line.split(/:\s+/);
-  const userSnowflake = parseSnowflake(userEntry[0]);
+  const userSnowflake = util.parseSnowflake(userEntry[0]);
   if (userSnowflake) {
     try {
       const user = await guild.fetchMember(userSnowflake);
