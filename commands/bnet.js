@@ -164,9 +164,9 @@ async function reloadBattleTagsCallback(guild, line) {
       const user = await guild.fetchMember(userSnowflake);
       addBattleTags(user, userEntry[1].split(/, /));
     } catch (e) {
-      console.error(e.message);
-      message.channel.send(
-          `No user with snowflake ${userSnowflake} found`);
+      console.log(
+          `ReloadBattleTags: No user with snowflake ${userSnowflake} found: ` + 
+          `${e.message}`);
     }
   }
 }
@@ -195,23 +195,6 @@ function* battleTagLineGenerator(battleTags) {
       .sort(BattleTagEntry.compare)) {
     yield entry.toEntryString();
   }
-}
-
-/**
- * Checks the permissions of a user against the required roles.
- * TODO(aalberg): Refactor this to a utility module.
- * @param {Discord.GuildMember} user The user to check
- * @param {string[]} requiredRoles The Snowflakes of the roles to check for
- * @return {bool} true if the specified GuildMemeber has one of the required
- * roles, and false otherwise.
- */
-function checkPermissions(user, requiredRoles) {
-  for (role of requiredRoles) {
-    if (user.roles.has(role)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -244,7 +227,7 @@ module.exports = {
   onStart(client, config) {
     console.log(`Starting ${this.name}`);
     kHeaderString = kHeaderString.replace('{prefix}', config.prefix);
-    channelId = config.args[this.name]['channelId'];
+    channelId = config.args[this.name].channelId;
     modRoles = [];
     ['admin', 'mod'].forEach((r) => {
       if (config.roles[r]) {
@@ -266,37 +249,37 @@ module.exports = {
     const subcommand = args.shift();
     switch (subcommand) {
       case 'reload':
-        if (checkPermissions(message.member, modRoles)) {
+        if (util.checkPermissions(message.member, modRoles)) {
           reloadBattleTags(message.client, message.guild, channelId);
         } else {
           message.channel.send('Permission denied');
         }
         break;
       case 'print':
-        if (checkPermissions(message.member, modRoles)) {
+        if (util.checkPermissions(message.member, modRoles)) {
           printBattleTags(message.client, channelId);
         } else {
           message.channel.send('Permission denied');
         }
         break;
       case 'add':
-        if (checkArgs(message.channel, args, 2)) {
+        if (checkArgs(message.channel, args, 1)) {
           addBattleTags(message.member, [args[0]]);
           printBattleTags(message.client, channelId);
         }
         message.delete();
         break;
       case 'remove':
-        if (checkArgs(message.channel, args, 2)) {
+        if (checkArgs(message.channel, args, 1)) {
           removeBattleTags(message.channel, message.member.id, [args[0]]);
           printBattleTags(message.client, channelId);
         }
         message.delete();
         break;
       case 'adminadd':
-        if (checkPermissions(message.member, modRoles)) {
-          if (checkArgs(message.channel, args, 3)) {
-            const snowflake = parseSnowflake(args[0]);
+        if (util.checkPermissions(message.member, modRoles)) {
+          if (checkArgs(message.channel, args, 2)) {
+            const snowflake = util.parseSnowflake(args[0]);
             if (snowflake) {
               message.guild.fetchMember(snowflake).then((user) => {
                 addBattleTags(user, [args[1]]);
@@ -315,9 +298,9 @@ module.exports = {
         }
         break;
       case 'adminremove':
-        if (checkPermissions(message.member, modRoles)) {
-          if (checkArgs(message.channel, args, 3)) {
-            const snowflake = parseSnowflake(args[0]);
+        if (util.checkPermissions(message.member, modRoles)) {
+          if (checkArgs(message.channel, args, 2)) {
+            const snowflake = util.parseSnowflake(args[0]);
             if (snowflake) {
               removeBattleTags(message.channel, snowflake, [args[1]]);
               printBattleTags(message.client, channelId);
