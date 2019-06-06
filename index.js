@@ -20,10 +20,6 @@ for (const file of commandFiles) {
 // Setup collection to manage per-command cooldowns.
 const cooldowns = new Discord.Collection();
 
-// Keep track of existing guest invite usages.
-// This is used to let the bot automatically assign roles if necessary.
-let guestUses = 0;
-
 // A pretty useful method to create a delay without blocking the whole script.
 const wait = require('util').promisify(setTimeout);
 
@@ -33,32 +29,14 @@ client.once('ready', () => {
   // "ready" isn't really ready. We need to wait a spell.
   // NOTE(teejusb): Not sure if this is necessary, but it was recommended here:
   // https://github.com/AnIdiotsGuide/discordjs-bot-guide/blob/master/coding-guides/tracking-used-invites.md
-  // It's probably used to wait while the fetchInvites promise completes.
   wait(1000);
 
-  // Initialize all of the commands.
+  // Initialize all of the commands. 
   for (const entry of client.commands) {
     const command = entry[1];
     if (util.exists(command.onStart)) {
       command.onStart(client, config);
     }
-  }
-
-  // Get all the invites from the Zerowatch discord.
-  const guild = client.guilds.get(config.guildId);
-  if (guild) {
-    guild.fetchInvites()
-        .then((guildInvites) => {
-          console.log(`There are currently ${guildInvites.size} invites.`);
-          for (const [code, invite] of guildInvites) {
-            console.log(
-                `  Available invite code ${code} with ${invite.uses} uses`);
-            // Only need to keep track of guest invite usages.
-            if (code === config.guestCode) {
-              guestUses = invite.uses;
-            }
-          }
-        });
   }
 
   console.log('Ready!');
@@ -93,26 +71,6 @@ client.on('messageReactionRemove', async (messageReaction, user) => {
 // Handler for when new members join the server.
 
 client.on('guildMemberAdd', (member) => {
-  member.guild.fetchInvites().then((guildInvites) => {
-    const invite = guildInvites.get(config.guestCode);
-    if (invite) {
-      if (invite.uses == guestUses) {
-        const role = member.guild.roles.find((r) => r.name === 'Member');
-        member.addRole(role, 'Auto-added via bot.');
-        const welcomeChannel =
-            client.channels.get(config.welcomeChannelId);
-        if (welcomeChannel) {
-          welcomeChannel.send(`Welcome ${member.toString()}!`)
-              .catch(console.error);
-        } else {
-          console.log(`Could not find channel ${config.welcomeChannelId}`);
-        }
-      } else {
-        guestUses = invite.uses;
-      }
-    }
-  });
-  
   for (const entry of client.commands) {
     const command = entry[1];
     if (util.exists(command.onGuildMemberAdd)) {
