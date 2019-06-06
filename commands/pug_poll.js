@@ -416,7 +416,7 @@ module.exports = {
     } else if (args[0] === 'post') {
       postPoll(new Date());
     } else if (args[0] === 'delete') {
-      deletePoll();
+      message.channel.send('Not yet implemented');
     } else if (args[0] === 'announce') {
       announcePug(new Date().getDay());
     }
