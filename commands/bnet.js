@@ -165,7 +165,7 @@ async function reloadBattleTagsCallback(guild, line) {
       addBattleTags(user, userEntry[1].split(/, /));
     } catch (e) {
       console.log(
-          `ReloadBattleTags: No user with snowflake ${userSnowflake} found: ` + 
+          `ReloadBattleTags: No user with snowflake ${userSnowflake} found: ` +
           `${e.message}`);
     }
   }
