@@ -153,7 +153,7 @@ function checkPermissions(user, requiredRoles) {
 /**
  * Checks if a given user is a mod or admin.
  * @param {Discord.GuildMember} user The user to check
- * @return {bool} true if the GuildMemeber has the mod or admins roles, and 
+ * @return {bool} true if the GuildMemeber has the mod or admins roles, and
  * false otherwise.
  */
 function isMod(user) {

@@ -62,7 +62,7 @@ class TimeoutEntry {
   /**
    * Sets the current timeout to a new value.
    *
-   * @param {Date} timeout The timeout date to store.
+   * @param {Date} newTimeout The timeout date to store.
    */
   setTimeout(newTimeout) {
     this.timeout = newTimeout;
@@ -72,11 +72,11 @@ class TimeoutEntry {
    * Updates the current timeout to a new value if the new timeout is later in
    * time than the current one.
    *
-   * @param {Date} timeout The timeout date to potentially store.
+   * @param {Date} newTimeout The timeout date to potentially store.
    */
   extendTimeout(newTimeout) {
     if (newTimeout > this.timeout) {
-      this.timeout = newTimeout
+      this.timeout = newTimeout;
     }
   }
 
@@ -117,7 +117,8 @@ class TimeoutEntry {
    * string and a list of BattleTags.
    */
   toEntryString() {
-    return this.user.toString() + ': ' + this.timeout.getTime() + ', ' + this.timeout;
+    return this.user.toString() + ': ' + this.timeout.getTime() + ', ' +
+        this.timeout;
   }
 };
 
@@ -139,7 +140,7 @@ function addTimeout(user, timeout, extend = false) {
     timeoutMap.get(key).extendTimeout(timeout);
   } else {
     timeoutMap.get(key).setTimeout(timeout);
-  } 
+  }
 }
 
 /**
@@ -183,44 +184,44 @@ function removeTimeoutAndUpdate(snowflake) {
 }
 
 /**
- * Remove a user from the server. The user will not be removed and their 
+ * Remove a user from the server. The user will not be removed and their
  * timeout will be cleared if they do not have the guest role. The timeout will
  * be extended for 1 hour if the user is in a voice channel at the time the
  * the timeout expires.
- * @param {TimeoutEntry} user_entry The TimeoutEntry containing the user and
+ * @param {TimeoutEntry} userEntry The TimeoutEntry containing the user and
  * timeout information.
  */
-function removeUser(user_entry) {
-  if (!user_entry.user.roles.has(guestRole)) {
-    console.log(`User is not guest: ${user_entry.toEntryString()}`);
+function removeUser(userEntry) {
+  if (!userEntry.user.roles.has(guestRole)) {
+    console.log(`User is not guest: ${userEntry.toEntryString()}`);
     // TODO(aalberg) Remove this debug statement when we're confident
     // everything is working correctly.
     const channel = util.getChannelById(discordClient, debugChannelId);
     if (util.exists(channel)) {
-      channel.send(`User is not guest: ${user_entry.toEntryString()}`);
+      channel.send(`User is not guest: ${userEntry.toEntryString()}`);
     }
-    removeTimeout(user_entry.user.id);
+    removeTimeout(userEntry.user.id);
     return;
   }
-  console.log(`Voice channel ${user_entry.user.voiceChannel}`);
-  if (util.exists(user_entry.user.voiceChannel)) {
-    console.log(`Delaying kick of: ${user_entry.toEntryString()}`);
+  console.log(`Voice channel ${userEntry.user.voiceChannel}`);
+  if (util.exists(userEntry.user.voiceChannel)) {
+    console.log(`Delaying kick of: ${userEntry.toEntryString()}`);
     // TODO(aalberg) Remove this debug statement when we're confident
     // everything is working correctly.
     const channel = util.getChannelById(discordClient, debugChannelId);
     if (util.exists(channel)) {
-      channel.send(`Delaying kick of: ${user_entry.toEntryString()}`);
+      channel.send(`Delaying kick of: ${userEntry.toEntryString()}`);
     }
-    addTimeout(user_entry.user, util.addHours(new Date(), 1), true);
+    addTimeout(userEntry.user, util.addHours(new Date(), 1), true);
   } else {
-    console.log(`Kicking: ${user_entry.toEntryString()}`);
+    console.log(`Kicking: ${userEntry.toEntryString()}`);
     // TODO(aalberg): Update this to actually remove people when we're confident
     // everything is working correctly.
     const channel = util.getChannelById(discordClient, debugChannelId);
     if (util.exists(channel)) {
-      channel.send(`Kicking: ${user_entry.toEntryString()}`);
+      channel.send(`Kicking: ${userEntry.toEntryString()}`);
     }
-    removeTimeout(user_entry.user.id);
+    removeTimeout(userEntry.user.id);
   }
 }
 

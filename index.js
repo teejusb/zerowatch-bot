@@ -31,7 +31,7 @@ client.once('ready', () => {
   // https://github.com/AnIdiotsGuide/discordjs-bot-guide/blob/master/coding-guides/tracking-used-invites.md
   wait(1000);
 
-  // Initialize all of the commands. 
+  // Initialize all of the commands.
   for (const entry of client.commands) {
     const command = entry[1];
     if (util.exists(command.onStart)) {
