@@ -349,7 +349,11 @@ function getMonday(date) {
 }
 
 /**
- * Determines if a message reaction is for the 
+ * Determines if a message reaction is for the current day.
+ * @param {Discord.MessageReaction} messageReaction The message reaction to
+ * check.
+ * @return {bool} true if the reaction emoji corresponds to the current day,
+ * false otherwise.
  */
 function voteIsForToday(messageReaction) {
   return messageReaction.emoji.name === kEmojiDays[new Date().getDay()];
@@ -377,7 +381,7 @@ module.exports = {
 
   onMessageReactionAdd,
   onMessageReactionRemove,
-  onStart(client, config, private_config) {
+  onStart(client, config, privateConfig) {
     discordClient = client;
     module.exports.pugPollChannelId = config.pugPollChannelId;
     module.exports.pugAnnounceChannelId = config.pugAnnounceChannelId;

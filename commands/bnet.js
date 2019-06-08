@@ -241,7 +241,7 @@ module.exports = {
   usage: '[add|remove] [battleTag]',
   cooldown: 1,
   description: 'Battletag management',
-  onStart(client, config, private_config) {
+  onStart(client, config, privateConfig) {
     console.log(`Starting ${this.name}`);
     kHeaderString = kHeaderString.replace('{prefix}', config.prefix);
     channelId = config.args[this.name]['channelId'];

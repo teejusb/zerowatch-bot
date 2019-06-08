@@ -1,5 +1,5 @@
 const util = require('../util/util.js');
-const { WebClient } = require('@slack/web-api');
+const {WebClient} = require('@slack/web-api');
 
 let slackClient = null;
 let slackChannel = null;
@@ -9,7 +9,7 @@ let slackChannel = null;
  * @param {string} text The text string to post.
  */
 async function postMessage(text) {
-  if (!util.exists(slackClient) || !util.exists(slackChannel)) { return; }
+  if (!util.exists(slackClient) || !util.exists(slackChannel)) return;
   await slackClient.chat.postMessage({
     channel: slackChannel,
     text: text,
@@ -19,7 +19,7 @@ async function postMessage(text) {
 module.exports = {
   postMessage,
   name: 'slack',
-  onStart(client, config, private_config) {
+  onStart(client, config, privateConfig) {
     slackChannel = config.slack.channel;
     slackClient = new WebClient(private_config.slackToken);
     slackClient.api.test();
@@ -29,7 +29,7 @@ module.exports = {
     return;
     if (args.length != 2) {
       message.channel.send('Wrong number of args');
-    } else if (args[0] == "post") {
+    } else if (args[0] == 'post') {
       postMessage(args[1]);
     } else {
       message.channel.send('Invalid subcommand');
