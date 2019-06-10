@@ -1,5 +1,6 @@
 const cron = require('cron');
 const util = require('../util/util.js');
+const slack = require('./slack.js');
 
 const validDays = new Map();
 validDays.set('🇲', 'Monday');
@@ -9,6 +10,8 @@ validDays.set('🇷', 'Thursday');
 validDays.set('🇫', 'Friday');
 validDays.set('🇸', 'Saturday');
 validDays.set('🇺', 'Sunday');
+
+const kEmojiDays = ['🇺', '🇲', '🇹', '🇼', '🇷', '🇫', '🇸'];
 
 // Store a reference to the client.
 let discordClient = null;
@@ -144,6 +147,8 @@ async function postPoll(weekday) {
       await message.react('🇸');
       await message.react('🇺');
     });
+    slack.postMessage(
+        'The PUG poll has been posted in the Zerowatch Discord. Go vote!');
   } else {
     console.log(
         'ERROR: Could not find PUG poll channel when creating new poll.');
@@ -184,9 +189,7 @@ async function announcePug(day) {
         const reactedUsers = await reaction.fetchUsers();
         console.log(`${reactedUsers.size} people have responded for today.`);
         if (reactedUsers.size >= 12) {
-          const pugAnnounce = discordClient.channels
-              .get(module.exports.pugAnnounceChannelId);
-          pugAnnounce.send(
+          sendToAll(
               `PUGs are happening today `
             + `(${validDays.get(days[day])}) in 3 hours! `
             + `Please mark your availability over at `
@@ -198,6 +201,8 @@ async function announcePug(day) {
             if (messageText.length > 0) messageText += ', ';
             messageText += user.toString();
           }
+          const pugAnnounce = discordClient.channels
+              .get(module.exports.pugAnnounceChannelId);
           pugAnnounce.send(messageText);
 
           console.log('Announced PUGs for today.');
@@ -295,20 +300,22 @@ async function messageReactionResponse(messageReaction, user, pugMessage,
     }
   }
 
-  const curDate = new Date();
-  // curDate.getDay() is 0-indexed where 0 = Sunday.
-  const days = ['🇺', '🇲', '🇹', '🇼', '🇷', '🇫', '🇸'];
+  // Notify discord and slack that we are close to having enough.
+  if (mode === 'add' && reactedUsers.size == 10 &&
+      voteIsForToday(messageReaction)) {
+    sendToAll(`We almost have enough players for ` +
+        `today (${validDays.get(emojiName)}). Go vote!`);
+  }
+
   // Only post these messages between 5PM PST and 8PM PST on the day of
   // the PUGs to minimize spam. 8PM PST is the usual start time for PUGs.
-  if (days[curDate.getDay()] === emojiName &&
+  const curDate = new Date();
+  if (voteIsForToday(messageReaction) &&
       17 <= curDate.getHours() && curDate.getHours() <= 19) {
-    const pugAnnounce =
-        discordClient.channels.get(module.exports.pugAnnounceChannelId);
-
     // If we hit 12, then that means we incremented from 11.
     // TODO(teejusb): Add functionality to modify PUGs time.
     if (mode === 'add' && reactedUsers.size === 12) {
-      pugAnnounce.send(
+      sendToAll(
           `PUGs are happening today `
         + `(${validDays.get(emojiName)}) at 8PM PST! `
         + `Please mark your availability over at `
@@ -317,8 +324,8 @@ async function messageReactionResponse(messageReaction, user, pugMessage,
     // quorum for that day.
     // If we hit 11, then that means we decremented from 12.
     } else if (mode === 'remove' && reactedUsers.size === 11) {
-      pugAnnounce.send(`We no longer have enough for PUGs `
-                     + `on ${validDays.get(emojiName)} :(`);
+      sendToAll(`We no longer have enough for PUGs ` +
+          `on ${validDays.get(emojiName)} :(`);
     }
   }
 };
@@ -341,6 +348,28 @@ function getMonday(date) {
   return date;
 }
 
+/**
+ * Determines if a message reaction is for the current day.
+ * @param {Discord.MessageReaction} messageReaction The message reaction to
+ * check.
+ * @return {bool} true if the reaction emoji corresponds to the current day,
+ * false otherwise.
+ */
+function voteIsForToday(messageReaction) {
+  return messageReaction.emoji.name === kEmojiDays[new Date().getDay()];
+}
+
+/**
+ * Send a message to both slack and the PUG announce channel.
+ * @param {string} text The text to send.
+ */
+function sendToAll(text) {
+  slack.postMessage(text);
+  const pugAnnounce =
+        discordClient.channels.get(module.exports.pugAnnounceChannelId);
+  pugAnnounce.send(text);
+}
+
 module.exports = {
   name: 'pug_poll',
   // The PUG poll channel and announce channel.
@@ -352,7 +381,7 @@ module.exports = {
 
   onMessageReactionAdd,
   onMessageReactionRemove,
-  onStart(client, config) {
+  onStart(client, config, privateConfig) {
     discordClient = client;
     module.exports.pugPollChannelId = config.pugPollChannelId;
     module.exports.pugAnnounceChannelId = config.pugAnnounceChannelId;

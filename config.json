@@ -13,5 +13,8 @@
     "bnet": {
       "channelId": "525072573499834378"
     }
+  },
+  "slack": {
+    "channel": "#lfg"
   }
 }
