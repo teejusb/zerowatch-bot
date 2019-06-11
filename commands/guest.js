@@ -89,7 +89,7 @@ class TimeoutEntry {
   }
 
   /**
-   * Compares two TimeoutEntry's for sorting.
+   * Compares two TimeoutEntry's for sorting by name.
    * @param {TimeoutEntry} a
    * @param {TimeoutEntry} b
    * @return {number} 0 if a and b are sorted equally, -1 if a should be sorted
@@ -101,15 +101,19 @@ class TimeoutEntry {
   }
 
   /**
-   * Compares two TimeoutEntry's for sorting.
+   * Compares two TimeoutEntry's for sorting by timeout time.
    * @param {TimeoutEntry} a
    * @param {TimeoutEntry} b
    * @return {number} 0 if a and b are sorted equally, -1 if a should be sorted
    * before b, and 1 if a should be sorted after b.
    */
   static compareTimes(a, b) {
-    return a.user.displayName.localeCompare(b.user.displayName, 'en',
-        {sensitivity: 'base'});
+    if (a.timeout < b.timeout) {
+      return -1;
+    } else if (a.timeout > b.timeout) {
+      return 1;
+    }
+    return 0;
   }
 
   /**
@@ -151,7 +155,7 @@ function addTimeout(user, timeout, extend = false) {
  */
 function addTimeoutAndUpdate(user, timeout) {
   addTimeout(user, timeout);
-  processTimeouts();
+  updateTimeouts();
 }
 
 /**
@@ -177,7 +181,7 @@ function removeTimeout(snowflake) {
  */
 function removeTimeoutAndUpdate(snowflake) {
   if (removeTimeout(snowflake)) {
-    processTimeouts();
+    updateTimeouts();
     return true;
   }
   return false;
@@ -233,7 +237,7 @@ function removeUser(userEntry) {
 function setCronTimeout(time) {
   console.log('New cron time: ' + time);
   if (!util.exists(timeoutCron)) {
-    timeoutCron = cron.job(time, processTimeouts);
+    timeoutCron = cron.job(time, updateTimeouts);
   } else {
     timeoutCron.setTime(cron.time(time));
   }
@@ -241,10 +245,10 @@ function setCronTimeout(time) {
 }
 
 /**
- * Process all of the currently active timeouts and remove guests whos timeouts
+ * Process all of the currently active timeouts and remove guests whose timeouts
  * have expired.
  */
-function processTimeouts() {
+function updateTimeouts() {
   const timeouts = getSortedTimeouts();
   if (timeouts.length == 0) {
     printTimeouts(discordClient, timeoutChannelId);
@@ -293,7 +297,7 @@ async function reloadTimeouts(client, guild, channelId) {
   timeoutMap = new Map();
   callback = reloadTimeoutsCallback.bind(null, guild);
   await util.iterateChannelLines(client, channelId, callback);
-  processTimeouts();
+  updateTimeouts();
   printTimeouts(client, channelId);
 }
 
@@ -446,8 +450,8 @@ module.exports = {
       case 'print':
         printTimeouts(discordClient, timeoutChannelId);
         break;
-      case 'process':
-        processTimeouts();
+      case 'update':
+        updateTimeouts();
         break;
       case 'add':
         if (checkArgCount(message.channel, args, 2)) {
