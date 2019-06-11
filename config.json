@@ -18,5 +18,8 @@
       "channelId": "582421234587795469",
       "debugChannelId": "525818599240368130"
     }
+  },
+  "slack": {
+    "channel": "#lfg"
   }
 }

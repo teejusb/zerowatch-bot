@@ -3,7 +3,7 @@ const Discord = require('discord.js');
 const util = require('./util/util.js');
 
 // TODO(aalberg): Use JSON.parse and maybe some more complex handling here.
-const {token} = require('./config_private.json');
+const privateConfig = require('./config_private.json');
 const config = require('./config.json');
 
 const client = new Discord.Client();
@@ -35,7 +35,7 @@ client.once('ready', () => {
   for (const entry of client.commands) {
     const command = entry[1];
     if (util.exists(command.onStart)) {
-      command.onStart(client, config);
+      command.onStart(client, config, privateConfig);
     }
   }
 
@@ -111,7 +111,10 @@ client.on('message', (message) => {
                       (cmd) => cmd.aliases &&
                           cmd.aliases.includes(commandName));
 
-  if (!command) return;
+  if (!command) {
+    console.log(`no command ${commandName}`);
+    return;
+  }
 
   // Sanity check for commands that require arguments.
   if (command.args && !args.length) {
@@ -169,4 +172,4 @@ client.on('error', (e) => console.error(e.name + ': ' + e.message));
 client.on('warn', (e) => console.warn(e.name + ': ' + e.message));
 client.on('debug', (e) => {});
 
-client.login(token);
+client.login(privateConfig.token);
