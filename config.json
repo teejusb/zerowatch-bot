@@ -1,17 +1,22 @@
 {
   "prefix": "!",
   "guildId": "525005678146879509",
-  "guestCode": "yDebKpH",
+  "guestCode": "99ettTU",
   "pugPollChannelId": "529910837415116800",
   "pugAnnounceChannelId": "529910877227319317",
   "welcomeChannelId": "525212789585870858",
   "roles": {
     "admin": "525008681667133440",
-    "mod": "525010134288564264"
+    "mod": "525010134288564264",
+    "guest": "573701998277296129"
   },
   "args": {
     "bnet": {
       "channelId": "525072573499834378"
+    },
+    "guest": {
+      "channelId": "582421234587795469",
+      "debugChannelId": "525818599240368130"
     }
   },
   "slack": {

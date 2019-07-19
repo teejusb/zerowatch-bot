@@ -420,7 +420,6 @@ module.exports = {
       console.log('No PUG poll channel');
     }
 
-    console.log('Attempting to start hour poller');
     hourPoller.start();
   },
   onMessage(message) {
@@ -436,15 +435,17 @@ module.exports = {
     }
   },
   execute(message, args) {
-    // TODO(aalberg) Refactor the permissions module from bnet to util so we
-    // can reenable this with actual user validation.
-    // return;
+    if (!util.isMod(message.member)) {
+      message.channel.send('Permission denied');
+      return;
+    }
+
     if (args.length > 1) {
       console.log('Too many args');
     } else if (args[0] === 'post') {
       postPoll(new Date());
     } else if (args[0] === 'delete') {
-      deletePoll();
+      message.channel.send('Not yet implemented');
     } else if (args[0] === 'announce') {
       announcePug(new Date().getDay());
     }

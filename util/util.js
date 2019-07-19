@@ -1,3 +1,5 @@
+const config = require('../config.json');
+
 const kCharsPerMessage = 1000;
 const kSnowflakeRegex = new RegExp(/<@!?(\d+)>/);
 
@@ -21,7 +23,7 @@ function parseSnowflake(text) {
  */
 function getChannelById(client, channelId) {
   if (!client) {
-    console.error('Error getting channel: No client specified');
+    console.error(`Error getting channel ${channelId}: No client specified`);
     return null;
   }
 
@@ -132,6 +134,63 @@ function printMessagesToChannel(client, channelId, textMessages) {
   }).catch(console.error);
 };
 
+/**
+ * Checks the permissions of a user against the required roles.
+ * @param {Discord.GuildMember} user The user to check
+ * @param {string[]} requiredRoles The Snowflakes of the roles to check for
+ * @return {bool} true if the specified GuildMemeber has one of the required
+ * roles, and false otherwise.
+ */
+function checkPermissions(user, requiredRoles) {
+  for (role of requiredRoles) {
+    if (user.roles.has(role)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks if a given user is a mod or admin.
+ * @param {Discord.GuildMember} user The user to check
+ * @return {bool} true if the GuildMemeber has the mod or admins roles, and
+ * false otherwise.
+ */
+function isMod(user) {
+  return user.roles.has(config.roles.admin) || user.roles.has(config.roles.mod);
+}
+
+/**
+ * Adds minutes to a provided date. Modifies the Date passed in.
+ * @param {Date} time The Date to add to
+ * @param {number} minutes The number of minutes to add.
+ * @return {Date} The provided Date with the number of minutes added.
+ */
+function addMinutes(time, minutes) {
+  time.setTime(time.getTime() + (minutes * 60 * 1000));
+  return time;
+}
+
+/**
+ * Adds hours to a provided date. Modifies the Date passed in.
+ * @param {Date} time The Date to add to
+ * @param {number} hours The number of hours to add.
+ * @return {Date} The provided Date with the number of hours added.
+ */
+function addHours(time, hours) {
+  return addMinutes(time, hours * 60);
+}
+
+/**
+ * Adds days to a provided date. Modifies the Date passed in.
+ * @param {Date} time The Date to add to
+ * @param {number} days The number of days to add.
+ * @return {Date} The provided Date with the number of days added.
+ */
+function addDays(time, days) {
+  return addHours(time, days * 24);
+}
+
 module.exports = {
   kCharsPerMessage,
   kSnowflakeRegex,
@@ -140,6 +199,11 @@ module.exports = {
   iterateChannelLines,
   printLinesToChannel,
   printMessagesToChannel,
+  checkPermissions,
+  isMod,
+  addMinutes,
+  addHours,
+  addDays,
   exists(val) {
     return (typeof val !== 'undefined' && val !== null);
   },
